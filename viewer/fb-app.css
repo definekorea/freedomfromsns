@@ -315,3 +315,13 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
 /* card text preview — FB posts have no real title, so one prominent block */
 .fb-text { font-size: .9rem; line-height: 1.45; color: var(--fg, #e8e8ea); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; word-break: break-word; }
 .fb-text-site { font-size: .72rem; color: #8a8a90; text-transform: uppercase; letter-spacing: .02em; margin-top: .35rem; }
+
+/* text-only card: no image — the text preview fills the whole card */
+.fb-card-text { position: relative; }
+.fb-card-text .fb-body { flex: 1; padding: 1rem .9rem; gap: .5rem; }
+.fb-card-text .fb-text { -webkit-line-clamp: 16; flex: 1; font-size: .92rem; }
+.fb-badge.float { position: absolute; top: .55rem; right: .55rem; z-index: 2; }
+
+/* reactive: an image with no text fills the whole card */
+.fb-thumb.fill { aspect-ratio: auto; flex: 1; min-height: 220px; }
+.fb-thumb-date { position: absolute; bottom: .45rem; left: .6rem; font-size: .72rem; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,.9); z-index: 2; }

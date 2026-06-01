@@ -102,6 +102,9 @@
   }
 
   function uniqueYears() { var s = {}; S.posts.forEach(function (p) { s[p.date.slice(0, 4)] = 1; }); return Object.keys(s).sort().reverse(); }
+  // length-based text fit for text-only cards (a cheap stand-in for a measured
+  // pretext fit — no per-card reflow): short → large + filling, long → compact.
+  function fitFont(len) { return len < 40 ? "1.5rem" : len < 90 ? "1.2rem" : len < 170 ? "1.05rem" : len < 280 ? ".92rem" : ".85rem"; }
 
   /* ── routing ────────────────────────────────────────────────────────── */
   //  Hash forms: #browse | #calendar | #chat | #post/<id> | #<view>=<query>.
@@ -203,20 +206,43 @@
     // lightbox over the WHOLE 미분류 set so you can navigate them all with the
     // thumbnail strip, instead of a text-less detail modal.
     var c = el("div", "fb-card"); c.onclick = function () { if (p.type === "uncat") openUncatLightbox(p); else openPost(p.id); };
-    var thumb;
-    if (p.thumb) { thumb = el("div", "fb-thumb"); var im = el("img"); im.loading = "lazy"; im.src = p.thumb; im.onerror = function () { thumb.classList.add("ph"); thumb.dataset.ic = p.vid ? "▶" : "▦"; im.remove(); }; thumb.appendChild(im); if (p.vid) thumb.appendChild(el("span", "fb-thumb-play", "▶")); }
-    else { thumb = el("div", "fb-thumb ph"); thumb.dataset.ic = p.type === "video" || p.type === "uncat" ? "▶" : p.type === "link" ? "🔗" : p.type === "share" ? "↻" : "▦"; }
-    var badge = el("div", "fb-badge " + p.type, TYPE[p.type] || "글"); thumb.appendChild(badge);
-    c.appendChild(thumb);
-    var body = el("div", "fb-body");
-    body.appendChild(el("div", "fb-date", fmtDate(p.date)));
-    // Facebook posts have no real title — `title` is just the first line of text —
-    // so show ONE prominent text preview, not the same line twice.
-    var textEl = el("div", "fb-text", p.preview || p.excerpt || p.title || "");
-    body.appendChild(textEl);
-    c.appendChild(body);
+    var isLink = p.type === "link" && p.link_url;
+    var hasImage = !!p.thumb;
+    var preview = (p.preview || p.excerpt || "").trim();
+    var hasText = !!preview;
+    var thumb = null, body = null, textEl = null;
+
+    // Reactive: whichever element is present takes the space. An image with no text
+    // FILLS the whole card; text with no image fills the card; with both, the image
+    // sits on top (fixed ratio) and the text below — no empty placeholder boxes.
+    if (hasImage || isLink) {
+      var fill = hasImage && !hasText && !isLink;   // image-only → let it fill
+      thumb = el("div", "fb-thumb" + (hasImage ? "" : " ph") + (fill ? " fill" : ""));
+      if (hasImage) {
+        var im = el("img"); im.loading = "lazy"; im.src = p.thumb;
+        im.onerror = function () { thumb.classList.add("ph"); thumb.dataset.ic = p.vid ? "▶" : "▦"; im.remove(); };
+        thumb.appendChild(im);
+        if (p.vid) thumb.appendChild(el("span", "fb-thumb-play", "▶"));
+      } else { thumb.dataset.ic = "🔗"; }                 // link awaiting its preview
+      thumb.appendChild(el("div", "fb-badge " + p.type, TYPE[p.type] || "글"));
+      if (fill) thumb.appendChild(el("div", "fb-thumb-date", fmtDate(p.date)));
+      c.appendChild(thumb);
+    } else {
+      c.classList.add("fb-card-text");                    // no visual → text takes over
+      c.appendChild(el("div", "fb-badge " + p.type + " float", TYPE[p.type] || "글"));
+    }
+    if (hasText || isLink || !hasImage) {
+      body = el("div", "fb-body");
+      body.appendChild(el("div", "fb-date", fmtDate(p.date)));
+      textEl = el("div", "fb-text", preview || (!hasImage ? (p.title || "(무제)") : ""));
+      // pretext-style fit (cheap, length-based): on a text-only card, a short post
+      // reads large and fills the card; a long one shrinks so more of it fits.
+      if (!hasImage) textEl.style.fontSize = fitFont(textEl.textContent.length);
+      body.appendChild(textEl);
+      c.appendChild(body);
+    }
     // link cards show the ACTUAL link preview (image + headline/site) instead of a 🔗
-    if (p.type === "link" && p.link_url && !p.thumb) enrichLinkCard(p, thumb, textEl, body);
+    if (isLink && !hasImage && textEl) enrichLinkCard(p, thumb, textEl, body);
     return c;
   }
   function enrichLinkCard(p, thumb, textEl, body) {
