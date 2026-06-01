@@ -7,25 +7,29 @@ Pick a theme from the 🎨 menu in the filter bar (a swatch + name per theme;
 the choice persists). Add a theme by dropping a `.json` here — no code, no
 restart.
 
-**Shipped set (34):**
-- `00-default` **Gold Noir** (dark).
-- **5 light themes** (`01`–`05`) matching real current light UIs of major sites:
-  Primary Pop (Google), Amber Linen (Amazon), Sapphire Mist (Facebook),
-  Scarlet Paper (YouTube), Electric Violet (Yahoo). These are the **light**
-  themes — white/near-white surfaces, dark text, the site's accent.
-- 2 from reference images: Mocha Mousse, Neon.
-- 10 from Framer's *10 elegant palettes*: Earth Tones, Vibrant Greens, Warm
-  Neutrals, Maroon Mood, Bold Orange, Cool Blues, Minimal, Pastels, Vibrant
-  Blues, Power Purple.
-- 16 from a palette gallery: Morning Sky, Burgundy Rose, Cocoa Lime, Barn Sage,
-  Cerulean, Evergreen, Jade Mist, Toffee, Coral Reef, Dusty Indigo, Tropical
-  Punch, Harvest, Deep Ocean, Pop Art, Dusty Dune, Espresso.
+**Shipped set (36):**
 
-The dark themes are interpretations — each takes its palette's signature color
-as the accent and tunes the base/surfaces to that hue. A **light theme must be
-a full token set** (it inverts surfaces + text), and should flip `hi-rgb` to
-`0,0,0` so the faint overlays darken instead of lighten — see `01-primary-pop`
-for the template.
+*Light themes (16):*
+- 5 major-site light UIs (`01`–`05`): Primary Pop (Google), Amber Linen
+  (Amazon), Sapphire Mist (Facebook), Scarlet Paper (YouTube), Electric Violet
+  (Yahoo).
+- 10 from Framer's *10 elegant palettes* (`08`–`17`): Earth Tones, Vibrant
+  Greens, Warm Neutrals, Maroon Mood, Bold Orange, Cool Blues, Minimal,
+  Pastels, Vibrant Blues, Power Purple.
+- `35` **Gallery** — a white-cube editorial theme (white bg, black ink, thin
+  rules; the photos supply the colour), after the CCA Tel Aviv-Yafo site.
+
+*Dark themes (20):*
+- `00-default` **Gold Noir**, `06` Mocha Mousse, `07` Neon.
+- 16 from a palette gallery (`18`–`33`): Morning Sky, Burgundy Rose, Cocoa Lime,
+  Barn Sage, Cerulean, Evergreen, Jade Mist, Toffee, Coral Reef, Dusty Indigo,
+  Tropical Punch, Harvest, Deep Ocean, Pop Art, Dusty Dune, Espresso.
+- `34` **Greyscale** — monochrome (silver accent on the neutral dark base).
+
+Dark themes take their palette's signature colour as the accent and tune the
+base to that hue. A **light theme must be a full token set** (it inverts
+surfaces + text) with `hi-rgb: 0,0,0` — see `01-primary-pop` (a coloured light
+theme) or `35-gallery` (a monochrome one) as templates.
 
 ---
 

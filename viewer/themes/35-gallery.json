@@ -1,0 +1,13 @@
+{
+  "name": "Gallery",
+  "tokens": {
+    "bg": "#ffffff", "bg-rgb": "255,255,255", "bg2": "#ffffff", "bg3": "#f4f4f4",
+    "line": "#e4e4e4", "line2": "#cccccc", "sunken": "#f0f0f0",
+    "shadow-rgb": "0,0,0", "hi-rgb": "0,0,0",
+    "txt": "#111111", "fg": "#111111", "fg-bright": "#000000", "dim": "#555555", "faint": "#8a8a8a",
+    "gold": "#000000", "gold-rgb": "0,0,0", "accent": "#1a1a1a", "on-accent": "#ffffff",
+    "brand-fg": "#1a1a1a", "brand-fg-2": "#555555",
+    "red": "#9c3b30", "red-rgb": "156,59,48", "blue": "#2f5588", "blue-rgb": "47,85,136",
+    "green": "#3f6b47", "green-rgb": "63,107,71"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "Greyscale",
+  "tokens": {
+    "gold": "#e6e6e6",
+    "gold-rgb": "230,230,230",
+    "accent": "#ffffff",
+    "on-accent": "#0b0b0b",
+    "brand-fg": "#cfcfcf",
+    "brand-fg-2": "#9a9a9a",
+    "red": "#c4c4c4",
+    "red-rgb": "196,196,196",
+    "blue": "#dcdcdc",
+    "blue-rgb": "220,220,220",
+    "green": "#aeaeae",
+    "green-rgb": "174,174,174"
+  }
+}
