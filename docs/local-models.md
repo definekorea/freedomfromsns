@@ -148,9 +148,11 @@ small-model findings above are the foundation for the on-device-processing quest
 
 ## Build order (when pursued)
 
-1. **Swap the local embedding default** to `paraphrase-multilingual-MiniLM-L12-v2`
-   (measured winner on CPU — see the hardware-tester table; *not* Nomic). Keep the
-   1024-dim models as a GPU-only option; expose a small picker. (S)
+1. ✅ **Local embedding default swapped** to `paraphrase-multilingual-MiniLM-L12-v2`
+   (measured winner on CPU; *not* Nomic), with a curated `EMBED_MODELS` registry
+   (`mini` for CPU, `large` = multilingual-e5 for GPU; jina-v3/nomic/bge-small ruled
+   out) and a model-aware "related" threshold. The hardware tester (probe →
+   micro-bench → back-off) selects the model and confirms viability. (S) — done.
 2. **Local chat (Ollama / 4-bit GGUF)** as a third Phase-A chat option; RAG-only
    synthesis through it; bundle/guide the runtime. (M)
 3. **Ternary Bonsai 1.7B** once a packaged cross-OS ternary runtime exists. (M, later)

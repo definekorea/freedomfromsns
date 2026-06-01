@@ -33,11 +33,37 @@ from pathlib import Path
 GEMINI_MODEL = "gemini-embedding-001"
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:embedContent"
 WEFT_EMBED_URL = os.environ.get("APICASCADE_URL", "http://localhost:8090").rstrip("/") + "/v1/embeddings"
-LOCAL_MODEL = os.environ.get("FBBACKUP_EMBED_MODEL", "jinaai/jina-embeddings-v3")
+LOCAL_MODEL = os.environ.get("FBBACKUP_EMBED_MODEL",
+                             "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
 # Per-provider score floor for "related" search (chat retrieval uses top-k rank).
 # weft = apicascade /v1/embeddings (mistral-embed, 1024-d) — tighter separation
 # than gemini/jina, so a higher floor.
-THRESHOLDS = {"gemini": 0.62, "weft": 0.78, "local": 0.30}  # jina-v3 similarities run tight
+THRESHOLDS = {"gemini": 0.62, "weft": 0.78, "local": 0.40}  # local floor depends on the model (see below)
+
+# Curated local embedding models the setup tester picks from — measured on CPU
+# (8 vCPU / no GPU): see docs/local-models.md. RULED OUT for auto-selection:
+#   jinaai/jina-embeddings-v3, intfloat/multilingual-e5-large — 1024-d, ~2–3.5 h to
+#       embed 24k on CPU and up to ~6.9 GB RAM → GPU only;
+#   nomic-embed-text-v1.5 — OOMs at large batch, slow on CPU, English-centric;
+#   BAAI/bge-small-en-v1.5 — English-only (weak for Korean).
+# 'large' is offered only when a GPU is detected.
+EMBED_MODELS = {
+    "mini":  {"id": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+              "dim": 384, "dl_mb": 240, "multilingual": True, "tier": "cpu",
+              "threshold": 0.40, "note": "fast multilingual — the CPU default (~86 texts/s)"},
+    "large": {"id": "intfloat/multilingual-e5-large",
+              "dim": 1024, "dl_mb": 2240, "multilingual": True, "tier": "gpu",
+              "threshold": 0.80, "note": "higher-quality multilingual — needs a GPU"},
+}
+
+
+def local_threshold(model_id: str) -> float:
+    """The 'related' score floor for a given local model (similarity scales differ
+    by model family). Falls back to the generic local floor."""
+    for m in EMBED_MODELS.values():
+        if m["id"] == model_id:
+            return m["threshold"]
+    return THRESHOLDS["local"]
 
 
 def gemini_key() -> str:
@@ -287,9 +313,10 @@ def embed(spaces_root: Path, out_dir: Path, workspace: str = "default") -> dict:
     arr /= (np.linalg.norm(arr, axis=1, keepdims=True) + 1e-9)
     np.save(out_dir / "embeddings.npy", arr)
     (out_dir / "embed-ids.json").write_text(json.dumps(ids), encoding="utf-8")
+    thr = local_threshold(model) if provider == "local" else THRESHOLDS.get(provider, 0.5)
     (out_dir / "embed-meta.json").write_text(json.dumps(
         {"provider": provider, "model": model, "dim": int(arr.shape[1]),
-         "count": len(ids), "threshold": THRESHOLDS.get(provider, 0.5)}), encoding="utf-8")
+         "count": len(ids), "threshold": thr}), encoding="utf-8")
     _clear_ckpt(out_dir)  # done → drop the resume checkpoint
     print(f"saved {arr.shape} ({provider}) -> {out_dir / 'embeddings.npy'}", flush=True)
     return {"provider": provider, "count": len(ids), "dim": int(arr.shape[1])}

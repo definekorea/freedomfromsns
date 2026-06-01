@@ -57,6 +57,12 @@ STRINGS: dict[str, dict[str, str]] = {
                           "or leave blank to skip: ",
         "embed_started": "Building the smart-search index in the background (see embed.log) "
                          "— browse while it runs.",
+        "microbench": "Testing embedding speed on your hardware…",
+        "embed_started_est": "Building the smart-search index in the background "
+                             "(~{min} min on your hardware; see embed.log) — browse while it runs.",
+        "backoff_slow": "On this hardware, local smart search would take ~{min} min. "
+                        "Browsing + keyword search work now; for fast meaning-based search, "
+                        "connect a free AI key in the app (skipped the local model for now).",
         "embed_skip": "Skipped. You can enable smart search & chat anytime in the app.",
         "tn_need_cf": "A permanent address needs cloudflared. Install it:",
         "tn_intro":  "A permanent address lives on your own domain (e.g. archive.yourname.com) and "
@@ -116,6 +122,12 @@ STRINGS: dict[str, dict[str, str]] = {
                           "건너뛰려면 비워 두세요: ",
         "embed_started": "백그라운드에서 스마트 검색 색인을 만드는 중입니다(embed.log) "
                          "— 그 사이 자유롭게 둘러보세요.",
+        "microbench": "이 컴퓨터에서 임베딩 속도를 측정하는 중…",
+        "embed_started_est": "백그라운드에서 스마트 검색 색인을 만드는 중입니다"
+                             "(이 컴퓨터 기준 약 {min}분; embed.log) — 그 사이 둘러보세요.",
+        "backoff_slow": "이 컴퓨터에서는 로컬 스마트 검색에 약 {min}분이 걸립니다. "
+                        "둘러보기·키워드 검색은 지금 바로 되고, 빠른 의미 검색을 원하면 "
+                        "앱에서 무료 AI 키를 연결하세요(로컬 모델은 일단 건너뜀).",
         "embed_skip": "건너뛰었습니다. 스마트 검색·AI 대화는 언제든 앱에서 켤 수 있어요.",
         "tn_need_cf": "고정 주소를 만들려면 cloudflared가 필요합니다. 설치:",
         "tn_intro":  "고정 주소는 내 도메인(예: archive.yourname.com)으로 제공되며 재시작해도 "
@@ -324,15 +336,145 @@ def detect_gpu() -> dict:
         return {"gpu": False, "name": "", "vram_mb": 0}
 
 
+def _available_mb() -> int:
+    """Available (not total) RAM in MB — the load-bearing number for the tester.
+    Cross-platform, stdlib only. 0 if it can't be read."""
+    try:
+        if os.name == "nt":
+            import ctypes
+
+            class _MS(ctypes.Structure):
+                _fields_ = [("dwLength", ctypes.c_ulong), ("dwMemoryLoad", ctypes.c_ulong),
+                            ("ullTotalPhys", ctypes.c_ulonglong), ("ullAvailPhys", ctypes.c_ulonglong),
+                            ("ullTotalPageFile", ctypes.c_ulonglong), ("ullAvailPageFile", ctypes.c_ulonglong),
+                            ("ullTotalVirtual", ctypes.c_ulonglong), ("ullAvailVirtual", ctypes.c_ulonglong),
+                            ("ullAvailExtendedVirtual", ctypes.c_ulonglong)]
+            ms = _MS(); ms.dwLength = ctypes.sizeof(_MS)
+            ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(ms))
+            return int(ms.ullAvailPhys) // (1024 * 1024)
+        mi = Path("/proc/meminfo")
+        if mi.exists():                                   # Linux
+            for line in mi.read_text().splitlines():
+                if line.startswith("MemAvailable:"):
+                    return int(line.split()[1]) // 1024
+        import subprocess                                 # macOS (total ≈ avail, good enough)
+        r = subprocess.run(["sysctl", "-n", "hw.memsize"], capture_output=True, text=True, timeout=5)
+        return int(r.stdout.strip()) // (1024 * 1024)
+    except Exception:  # noqa: BLE001
+        return 0
+
+
+def _ort_providers() -> list[str]:
+    """Accelerators onnxruntime can actually use (empty until it's installed)."""
+    try:
+        import onnxruntime
+        return list(onnxruntime.get_available_providers())
+    except Exception:  # noqa: BLE001
+        return []
+
+
 def detect_hardware() -> dict:
-    """GPU/CPU summary + a recommendation: 'local' when a CUDA GPU or Apple Silicon
-    is present (fast embeddings), else 'key' (local CPU embedding of a big archive
-    is slow, so a free/paid API key is the smoother path)."""
+    """GPU/CPU/RAM summary + a recommendation: 'local' when a CUDA GPU or Apple
+    Silicon is present (fast embeddings), else 'key' (local CPU embedding of a big
+    archive is slow). The micro-benchmark refines this empirically before committing."""
     import platform
     g = detect_gpu()
     apple = platform.system() == "Darwin" and platform.machine() in ("arm64", "aarch64")
-    return {**g, "cpu": os.cpu_count() or 1, "apple_silicon": apple,
-            "recommend": "local" if (g["gpu"] or apple) else "key"}
+    cuda = g["gpu"] or any("CUDA" in p for p in _ort_providers())
+    cores = os.cpu_count() or 1
+    avail = _available_mb()
+    # local is the default when there's a GPU/Apple Silicon, OR a capable multi-core
+    # CPU with headroom (the small model embeds ~24k in minutes there — the micro-
+    # benchmark still confirms before the long run). Weak/low-RAM → recommend a key.
+    local_ok = cuda or apple or (cores >= 4 and (avail == 0 or avail >= 2000))
+    return {**g, "cpu": cores, "apple_silicon": apple, "available_mb": avail,
+            "providers": _ort_providers(), "recommend": "local" if local_ok else "key"}
+
+
+# Curated model selection: which local model fits this machine (or fall to a key).
+def recommend_embed(hw: dict) -> dict:
+    """Pick from the curated registry by hardware: GPU → 'large', capable → 'mini',
+    weak/uncertain → recommend a cloud key. The micro-bench then confirms."""
+    from .embed import EMBED_MODELS
+    if hw.get("gpu") or any("CUDA" in p for p in hw.get("providers", [])):
+        return {"mode": "local", "model_key": "large", "model": EMBED_MODELS["large"]["id"]}
+    # Apple Silicon or a normal multi-core CPU → the small multilingual model
+    return {"mode": "local", "model_key": "mini", "model": EMBED_MODELS["mini"]["id"]}
+
+
+def sample_corpus(spaces_root: Path, workspace: str = "default", n: int = 16) -> list[str]:
+    """A tiny, representative text sample (incl. a long one) for the micro-benchmark."""
+    base = Path(spaces_root) / workspace
+    out: list[str] = []
+    if not base.is_dir():
+        return out
+    for ydir in sorted(base.iterdir(), reverse=True):     # newest years first
+        if not ydir.is_dir() or ydir.name.startswith("."):
+            continue
+        for p in sorted(ydir.glob("*.md")):
+            t = p.read_text(encoding="utf-8", errors="replace")
+            t = re.sub(r"^---\n.*?\n---\n", "", t, flags=re.S)
+            lines = [s.strip() for s in t.splitlines()
+                     if s.strip() and not s.strip().startswith(("#", "![", "🔗", "[▶", "📍", "📘"))]
+            s = " ".join(" ".join(lines).split())
+            if len(s) > 40:
+                out.append(s[:1200])
+            if len(out) >= n:
+                return out
+    return out
+
+
+def micro_benchmark(model_id: str, sample: list[str], batch: int = 16, timeout: int = 90) -> dict:
+    """Quick empirical probe (in a SUBPROCESS, so an OOM/crash can't take down the
+    wizard): load the model, embed the sample, report {ok, tps, peak_mb, dim}. This
+    is the only reliable signal — static specs mislead. Returns ok=False on
+    timeout/crash (→ the caller backs off to a key)."""
+    import json as _json
+    import subprocess
+    import tempfile
+    sf = Path(tempfile.gettempdir()) / "ffs-microbench.json"
+    sf.write_text(_json.dumps(sample), encoding="utf-8")
+    code = (
+        "import json,sys,time\n"
+        "from pathlib import Path\n"
+        "from fastembed import TextEmbedding\n"
+        "s=json.loads(Path(sys.argv[1]).read_text());bs=int(sys.argv[3])\n"
+        "m=TextEmbedding(model_name=sys.argv[2])\n"
+        "list(m.embed(s[:2],batch_size=bs))\n"
+        "t=time.time();v=list(m.embed(s,batch_size=bs));dt=time.time()-t\n"
+        "peak=0\n"
+        "try:\n"
+        " import resource\n"
+        " r=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss\n"
+        " peak=r//1024 if sys.platform!='darwin' else r//(1024*1024)\n"
+        "except Exception: pass\n"
+        "print(json.dumps({'tps':round(len(s)/dt,1) if dt else 0,'peak_mb':int(peak),'dim':len(v[0]) if v else 0}))\n"
+    )
+    try:
+        r = subprocess.run([sys.executable, "-c", code, str(sf), model_id, str(batch)],
+                           capture_output=True, text=True, timeout=timeout)
+        line = (r.stdout or "").strip().splitlines()[-1]
+        return {"ok": True, **_json.loads(line)}
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "reason": "timeout"}
+    except Exception as e:  # noqa: BLE001
+        return {"ok": False, "reason": str(e)[:80]}
+
+
+_MAX_LOCAL_MIN = 30   # if local embedding the whole archive would take longer, back off to a key
+
+
+def embed_viable(mb: dict, post_count: int, available_mb: int) -> tuple[bool, int]:
+    """From a micro-bench result, decide if local embedding is worth it, and the
+    estimated minutes for the whole archive. Backs off on failure, projected time
+    over ~30 min, or projected peak RAM over ~60% of what's available."""
+    if not mb.get("ok"):
+        return (False, 0)
+    tps = max(float(mb.get("tps") or 0), 0.01)
+    est_min = max(1, round(post_count / tps / 60))
+    peak = int(mb.get("peak_mb") or 0)
+    ram_ok = (available_mb <= 0) or (peak <= 0) or (peak < 0.6 * available_mb)
+    return (tps > 0 and est_min <= _MAX_LOCAL_MIN and ram_ok, est_min)
 
 
 def ensure_local_deps(gpu: bool) -> bool:
@@ -365,7 +507,7 @@ def ensure_local_deps(gpu: bool) -> bool:
     return False
 
 
-def spawn_background_embed(home: Path, provider: str, device: str = "") -> None:
+def spawn_background_embed(home: Path, provider: str, device: str = "", model: str = "") -> None:
     """Kick off `ffs embed` as a detached background process (logs to embed.log) so
     the semantic index builds while the user browses. Resumable + safe to re-run."""
     import subprocess
@@ -374,6 +516,8 @@ def spawn_background_embed(home: Path, provider: str, device: str = "") -> None:
     env["FBBACKUP_EMBED_PROVIDER"] = provider     # force this provider for the corpus
     if device:
         env["FBBACKUP_EMBED_DEVICE"] = device
+    if model:
+        env["FBBACKUP_EMBED_MODEL"] = model       # the tester-chosen local model
     log = open(home / "embed.log", "ab")
     kw: dict = {}
     if os.name == "nt":

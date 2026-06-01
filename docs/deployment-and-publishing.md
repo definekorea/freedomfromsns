@@ -337,12 +337,13 @@ Reordered around the §0.1 ladder: **ship Tier 0 the fastest, make AI an unlock.
    `--dry-run` prints the plan; `--run` starts it; suggests `service install` for
    always-on. Never touches an existing `~/.cloudflared/config.yml`. (M) — done.
 10. **Dockerfile + compose** for always-on. (S)
-11. **Hardware tester v2** — upgrade the Phase-A probe into the three-layer tester
-    (static probe → tiny **micro-benchmark in a subprocess** → runtime back-off), because
-    static specs mislead (a 130 MB model OOM-killed a box with 43 GB free). It picks the
-    `(embedding model, chat option, batch size)` combo, and **backs off to a cloud key**
-    when the micro-bench or the live embed underperforms. Design + measured data in
-    [`local-models.md`](local-models.md). (M)
+11. ✅ **Hardware tester v2** — `ffs setup` now: static probe (cores, **available** RAM,
+    `onnxruntime.get_available_providers()`, GPU/Apple) → curated `EMBED_MODELS` registry
+    pick (`mini`/`large`) → **micro-benchmark in a subprocess** on a real sample → projects
+    the full-archive time + RAM and **backs off to a cloud key** when it'd be too slow or
+    OOM-risky (the live embed is resumable). Default flipped to MiniLM-multilingual; long-
+    context/1024-dim models ruled out for CPU. Measured data in [`local-models.md`](local-models.md). (M) — done.
+    *(Live-embed watchdog — switch mid-run if it stalls — is the remaining nice-to-have.)*
 12. **Mobile** — see the Mobile section below. (L)
 
 ---

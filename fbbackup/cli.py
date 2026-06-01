@@ -264,11 +264,12 @@ def cmd_setup(args) -> int:
         bres = materialize(p["index"], p["spaces"])
     say("built", n=bres.get("written", "?"))
 
-    # 3. Tier 0 is ready. Offer smart search / chat (Tier 1) — GPU-aware.
+    # 3. Tier 0 is ready. Offer smart search / chat (Tier 1) — hardware-aware.
     say("tier0")
+    hw = wiz.detect_hardware()
+    post_count = int(bres.get("written") or 0)
     choice = args.embed or ("skip" if args.yes else "")
     if not choice:
-        hw = wiz.detect_hardware()
         say("smart_offer")
         say("hw_gpu", name=hw["name"]) if hw["gpu"] else say("hw_cpu")
         default = "1" if hw["recommend"] == "local" else "2"
@@ -277,17 +278,23 @@ def cmd_setup(args) -> int:
         except EOFError:
             pick = "3"
         choice = {"1": "local", "2": "gemini", "3": "skip"}.get(pick, "skip")
-        gpu = hw["gpu"]
-    else:
-        gpu = wiz.detect_gpu()["gpu"]
 
     if choice == "local":
+        rec = wiz.recommend_embed(hw)              # curated registry: which model fits
+        model, gpu = rec["model"], hw["gpu"]
         say("installing_local")
-        if wiz.ensure_local_deps(gpu):
-            wiz.spawn_background_embed(home, "local", device="gpu" if gpu else "")
-            say("embed_started")
-        else:
+        if not wiz.ensure_local_deps(gpu):
             say("install_fail")
+        else:
+            say("microbench")                      # tiny empirical probe before the long run
+            sample = wiz.sample_corpus(p["spaces"], n=16)
+            mb = wiz.micro_benchmark(model, sample) if sample else {"ok": True, "tps": 50, "peak_mb": 0}
+            viable, est_min = wiz.embed_viable(mb, post_count, hw.get("available_mb", 0))
+            if viable:
+                wiz.spawn_background_embed(home, "local", device="gpu" if gpu else "", model=model)
+                say("embed_started_est", min=est_min)
+            else:
+                say("backoff_slow", min=est_min)   # too slow / OOM-risk → steer to a key
     elif choice == "gemini":
         from .embed import gemini_key
         from . import providers
