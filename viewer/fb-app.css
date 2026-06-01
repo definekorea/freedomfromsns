@@ -40,6 +40,10 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
 .fb-bar { max-width: var(--max); margin: 0 auto; display: flex; align-items: center; gap: 1rem; padding: .7rem 1.1rem; }
 .fb-brand { font-family: "Bebas Neue", "Pretendard Variable", Impact, sans-serif; font-size: 1.7rem; letter-spacing: 1.5px; color: #dcd8cc; white-space: nowrap; line-height: 1; }
 .fb-brand .fa { color: var(--gold); font-size: 1.32em; font-weight: 700; text-shadow: 0 0 18px rgba(224,192,96,.35); margin: 0 -.02em; }
+.fb-brand.img { display: flex; align-items: center; gap: .5rem; }
+.fb-logo-img { height: 38px; width: 38px; object-fit: contain; border-radius: 9px; display: block; flex: none; }
+.fb-logo-text { font-size: 1.05rem; letter-spacing: 1px; color: #b3b0a6; }   /* the name, quieter beside the emblem */
+.fb-logo-text .fa { color: var(--gold); font-size: 1.16em; font-weight: 700; text-shadow: none; }
 .fb-tabs { display: flex; gap: .25rem; }
 .fb-tab { padding: .4rem .85rem; border-radius: 999px; color: var(--dim); font-size: .92rem; font-weight: 500; transition: .15s; }
 .fb-tab:hover { color: #fff; background: var(--bg3); }

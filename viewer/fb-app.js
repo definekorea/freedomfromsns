@@ -8,6 +8,10 @@
   "use strict";
   var CFG = window.FFS || {};
   var PAGE = 60;
+  // Brand logo cycles on click (the Browse tab handles Home): the typographic
+  // wordmark (null) then the generated emblems. Choice persists in localStorage.
+  var LOGOS = [null, "/static/logo-candidates/01-monogram.png",
+    "/static/logo-candidates/02-bird.png", "/static/logo-candidates/03-unplug.png"];
 
   /* ── i18n (KO / EN) ──────────────────────────────────────────────────── */
   var I18N = {
@@ -82,6 +86,7 @@
     semanticLoading: false, searchToken: 0,
     ctx: null,                  // ordered post ids for detail prev/next (current context)
     selMode: false, sel: {}, selAnchor: null,   // multi-select: mode, {id:true}, range anchor
+    logo: (function () { try { return (parseInt(localStorage.getItem("ffs.logo"), 10) || 0) % 4; } catch (e) { return 0; } })(),
     showErased: (function () { try { return localStorage.getItem("ffs.showErased") === "1"; } catch (e) { return false; } })(),
     scroll: (function () { try { return JSON.parse(localStorage.getItem("ffs.scroll") || "{}") || {}; } catch (e) { return {}; } })(),
     _rendered: null,            // last view actually rendered (for enter-restore)
@@ -98,6 +103,16 @@
   // picked out as accents — the "FFS" reads out of the full name.
   function brandWordmark() {
     return '<span class="fa">F</span>reedom<span class="fa">F</span>rom<span class="fa">S</span>NS';
+  }
+  // Render the current logo into the brand. The wordmark variant is the big
+  // lettering; an emblem variant pairs the icon with the same wordmark, smaller
+  // and less prominent, so the name still reads next to the graphic.
+  function renderBrand(brand) {
+    var src = LOGOS[S.logo % LOGOS.length];
+    brand.classList.toggle("img", !!src);
+    brand.innerHTML = src
+      ? ('<img class="fb-logo-img" src="' + src + '" alt="FreedomFromSNS"><span class="fb-logo-text">' + brandWordmark() + '</span>')
+      : brandWordmark();
   }
 
   fetch(CFG.index).then(function (r) { return r.json(); }).then(function (data) {
@@ -121,8 +136,13 @@
   function buildChrome() {
     var top = el("div", "fb-top");
     var bar = el("div", "fb-bar");
-    var brand = el("div", "fb-brand"); brand.innerHTML = brandWordmark();
-    brand.style.cursor = "pointer"; brand.onclick = goHome;
+    var brand = el("div", "fb-brand"); renderBrand(brand);
+    brand.style.cursor = "pointer"; brand.title = "FreedomFromSNS";
+    brand.onclick = function () {   // cycle the logo design (Browse goes Home)
+      S.logo = (S.logo + 1) % LOGOS.length;
+      try { localStorage.setItem("ffs.logo", String(S.logo)); } catch (e) {}
+      renderBrand(brand);
+    };
 
     var tabs = el("div", "fb-tabs");
     els.tabBrowse = el("button", "fb-tab", tr("browse")); els.tabBrowse.onclick = goHome;
