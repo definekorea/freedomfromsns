@@ -748,6 +748,9 @@ def _build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("uninstall", help="remove launchers/auto-start/caches (keeps your data)")
 
+    lc = sub.add_parser("localchat", help="download + run a no-key local AI chat model (PrismML Bonsai 1.7B)")
+    lc.add_argument("--stop", action="store_true", help="how to stop the local model server")
+
     sh = sub.add_parser("share", help="Cloudflare quick tunnel to a running server")
     sh.add_argument("--port", default="9119", help="local port to expose (default 9119)")
 
@@ -779,8 +782,36 @@ def _build_parser() -> argparse.ArgumentParser:
     return ap
 
 
+def cmd_localchat(args) -> int:
+    """Download + run PrismML Ternary Bonsai (1.7B) as a no-key local chat model,
+    set it as the chat provider, and test it. Offline + no GPU; weak on Korean —
+    for quality, prefer a Gemini key. RAG-only (the agentic loop is Gemini-native)."""
+    from fbbackup import localchat, providers
+    home = _home()
+    os.environ["FBBACKUP_HOME"] = str(home)
+    if getattr(args, "stop", False):
+        print("The local model server runs detached. Stop it via Task Manager (Windows) "
+              "or `pkill -f llama-server` (mac/Linux).")
+        return 0
+    print("Setting up no-key local AI chat — PrismML Ternary Bonsai 1.7B.", flush=True)
+    print("It's small + English-centric, so Korean answers are rough; for best quality "
+          "connect a free Gemini key instead. First run downloads ~0.6 GB.", flush=True)
+    if not localchat.start():
+        print(f"✗ Couldn't download/start the local model. See {localchat.cache_dir() / 'server.log'}.",
+              file=sys.stderr)
+        return 1
+    providers.save_settings({"chat": {"provider": localchat.PROVIDER,
+                                      "fast_model": "bonsai", "precise_model": "bonsai"}})
+    print(f"✓ Running at http://127.0.0.1:{localchat.PORT} and set as your chat provider.", flush=True)
+    ok, detail = providers.test_chat(localchat.PROVIDER, "bonsai")
+    print(f"  test: {'OK — ' if ok else 'FAILED — '}{detail}", flush=True)
+    print("Open the app and try AI chat — it'll use the local model. Re-run `ffs localchat` anytime.", flush=True)
+    return 0
+
+
 _DISPATCH = {
     "setup": cmd_setup,
+    "localchat": cmd_localchat,
     "parse": cmd_parse, "build": cmd_build, "embed": cmd_embed, "index": cmd_index,
     "serve": cmd_serve, "share": cmd_share, "tunnel": cmd_tunnel, "shortcut": cmd_shortcut,
     "tray": cmd_tray, "autostart": cmd_autostart, "uninstall": cmd_uninstall,

@@ -153,9 +153,15 @@ small-model findings above are the foundation for the on-device-processing quest
    (`mini` for CPU, `large` = multilingual-e5 for GPU; jina-v3/nomic/bge-small ruled
    out) and a model-aware "related" threshold. The hardware tester (probe →
    micro-bench → back-off) selects the model and confirms viability. (S) — done.
-2. **Local chat (Ollama / 4-bit GGUF)** as a third Phase-A chat option; RAG-only
-   synthesis through it; bundle/guide the runtime. (M)
-3. **Ternary Bonsai 1.7B** once a packaged cross-OS ternary runtime exists. (M, later)
+2. ✅ **Ternary Bonsai 1.7B local chat** — built (`fbbackup/localchat.py` + `ffs
+   localchat`). We download a prebuilt `llama-server` from PrismML's llama.cpp fork
+   (release `prism-b8846-d104cf1`; has the Q2_0 ternary kernels — no compiler), plus
+   the `Ternary-Bonsai-1.7B-Q2_0` GGUF, run a loopback OpenAI server (:8284), and add
+   a no-key `bonsai` chat provider; the existing RAG path uses it unchanged. Validated
+   on Linux (binary downloads/extracts/runs). RAG-only; weak on Korean — an offline/
+   low-power option, prefer a Gemini key for quality. Ollama remains a manual option.
+3. Fold a hardware-gated **opt-in offer** into the setup wizard once it's confirmed
+   to run acceptably on a low-powered device. (next)
 
 ## Sources
 - PrismML Ternary Bonsai: <https://prismml.com/news/ternary-bonsai>, <https://www.prnewswire.com/news-releases/prismml-introduces-ternary-bonsai-model-family-302745151.html>
