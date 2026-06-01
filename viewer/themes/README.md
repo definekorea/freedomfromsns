@@ -7,29 +7,31 @@ Pick a theme from the 🎨 menu in the filter bar (a swatch + name per theme;
 the choice persists). Add a theme by dropping a `.json` here — no code, no
 restart.
 
-**Shipped set (36):**
+**Shipped set (36).** Filename order = menu order. The **install default**
+(index 0, applied when nothing is stored yet) is **Sapphire Mist**, and the top
+of the menu is **Sapphire Mist · Gallery · Minimal**, then **Gold Noir**, then
+the rest.
 
 *Light themes (16):*
-- 5 major-site light UIs (`01`–`05`): Primary Pop (Google), Amber Linen
-  (Amazon), Sapphire Mist (Facebook), Scarlet Paper (YouTube), Electric Violet
-  (Yahoo).
-- 10 from Framer's *10 elegant palettes* (`08`–`17`): Earth Tones, Vibrant
-  Greens, Warm Neutrals, Maroon Mood, Bold Orange, Cool Blues, Minimal,
-  Pastels, Vibrant Blues, Power Purple.
-- `35` **Gallery** — a white-cube editorial theme (white bg, black ink, thin
-  rules; the photos supply the colour), after the CCA Tel Aviv-Yafo site.
+- 5 major-site light UIs: Primary Pop (Google), Amber Linen (Amazon),
+  **Sapphire Mist** (Facebook), Scarlet Paper (YouTube), Electric Violet (Yahoo).
+- 10 from Framer's *10 elegant palettes*: Earth Tones, Vibrant Greens, Warm
+  Neutrals, Maroon Mood, Bold Orange, Cool Blues, **Minimal**, Pastels, Vibrant
+  Blues, Power Purple.
+- **Gallery** — white-cube editorial (white bg, black ink, thin rules; the
+  photos supply the colour), after the CCA Tel Aviv-Yafo site.
 
 *Dark themes (20):*
-- `00-default` **Gold Noir**, `06` Mocha Mousse, `07` Neon.
-- 16 from a palette gallery (`18`–`33`): Morning Sky, Burgundy Rose, Cocoa Lime,
-  Barn Sage, Cerulean, Evergreen, Jade Mist, Toffee, Coral Reef, Dusty Indigo,
-  Tropical Punch, Harvest, Deep Ocean, Pop Art, Dusty Dune, Espresso.
-- `34` **Greyscale** — monochrome (silver accent on the neutral dark base).
+- **Gold Noir** (also the CSS `:root` fallback), Mocha Mousse, Neon.
+- 16 from a palette gallery: Morning Sky, Burgundy Rose, Cocoa Lime, Barn Sage,
+  Cerulean, Evergreen, Jade Mist, Toffee, Coral Reef, Dusty Indigo, Tropical
+  Punch, Harvest, Deep Ocean, Pop Art, Dusty Dune, Espresso.
+- **Greyscale** — monochrome (silver accent on the neutral dark base).
 
 Dark themes take their palette's signature colour as the accent and tune the
 base to that hue. A **light theme must be a full token set** (it inverts
-surfaces + text) with `hi-rgb: 0,0,0` — see `01-primary-pop` (a coloured light
-theme) or `35-gallery` (a monochrome one) as templates.
+surfaces + text) with `hi-rgb: 0,0,0` — see **Sapphire Mist** (a coloured light
+theme) or **Gallery** (a monochrome one) as templates.
 
 ---
 
@@ -39,7 +41,7 @@ theme) or `35-gallery` (a monochrome one) as templates.
    (the "Gold Noir" look) and uses **only** those tokens everywhere. With JS
    off, the default theme still renders.
 2. `fbbackup/ffs_server.py` → `home()` scans `viewer/themes/*.json` (sorted by
-   filename, so `00-default` is first), and injects them as
+   filename → menu order; index 0 is the install default), and injects them as
    `window.FFS.themes = [{name, tokens}, …]`.
 3. A tiny `<head>` script in `index.html` applies the **persisted** theme before
    first paint (no flash). `fb-app.js` (`applyTheme` / `setTheme`) handles
@@ -65,9 +67,11 @@ theme) or `35-gallery` (a monochrome one) as templates.
 ```
 
 - **Order:** files are sorted by filename; prefix `00-`, `01-`, … to control the
-  cycle order. `00-default.json` should stay first (it's the full reference).
-- **Partial vs full:** `00-default.json` lists every token (the canonical
-  reference). Variant themes only need the tokens they override.
+  menu order. The file at index 0 is the install default (currently
+  `00-sapphire-mist.json`).
+- **Partial vs full:** the **Gold Noir** file (`gold-noir.json`) lists every
+  token — the canonical reference. Variant themes only need the tokens they
+  override (a light theme, though, must set the full surface + text set).
 
 ---
 
@@ -110,7 +114,8 @@ so tints and shadows — written `rgba(var(--x-rgb), a)` — re-tint with the th
 
 ## Add / author a theme
 
-1. Copy `00-default.json` to `NN-<name>.json` (pick `NN` for its cycle slot).
+1. Copy `gold-noir.json` (the full reference) to `NN-<name>.json` (pick `NN`
+   for its menu slot).
 2. Change the tokens you want; delete the ones you keep at default (optional).
 3. Reload — `home()` re-scans per request, so it's in the 🎨 cycle immediately.
 4. Pick it with 🎨. To make it the default, name it to sort first.
