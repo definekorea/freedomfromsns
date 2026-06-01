@@ -398,6 +398,29 @@ def register(app: FastAPI, b) -> None:
         set_erased(b, fbids, flag)
         return {"fbids": fbids, "erased": flag, "count": len(fbids)}
 
+    @app.get("/api/embed/status")
+    def embed_status():
+        """Drives the in-app smart-search progress pill: ready / running(progress) / none."""
+        import time as _t
+        d = b._emb_dir("default")
+        npy, meta, prog = d / "embeddings.npy", d / "embed-meta.json", d / "embed-progress.json"
+        if prog.is_file():                                  # a fresh job wins (covers re-embeds)
+            try:
+                pr = json.loads(prog.read_text(encoding="utf-8"))
+                if _t.time() - float(pr.get("ts", 0)) < 120:
+                    done, total = int(pr.get("done", 0)), int(pr.get("total", 0)) or 1
+                    return {"state": "running", "done": done, "total": total,
+                            "pct": round(100 * done / total), "provider": pr.get("provider")}
+            except Exception:  # noqa: BLE001
+                pass
+        if npy.is_file() and meta.is_file():
+            try:
+                m = json.loads(meta.read_text(encoding="utf-8"))
+            except Exception:  # noqa: BLE001
+                m = {}
+            return {"state": "ready", "count": m.get("count"), "provider": m.get("provider")}
+        return {"state": "none"}
+
     @app.get("/api/publish/status")
     def publish_status():
         return _tunnel_status()

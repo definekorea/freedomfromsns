@@ -393,6 +393,12 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
 .fb-pub-need { color: var(--muted); font-size: .9rem; line-height: 1.5; }
 .fb-pub-note { color: var(--faint); font-size: .8rem; line-height: 1.5; margin-top: 1.1rem; }
 
+/* smart-search build pill (background embedding) */
+.fb-embed-pill { position: fixed; left: 1rem; bottom: 1rem; z-index: 55; max-width: 80vw; padding: .5rem .85rem; border-radius: 999px; background: var(--bg2); color: var(--txt); border: 1px solid var(--line); box-shadow: 0 6px 24px rgba(var(--shadow-rgb),.32); font-size: .85rem; opacity: 0; transform: translateY(8px); pointer-events: none; transition: opacity .25s, transform .25s; }
+.fb-embed-pill.on { opacity: 1; transform: translateY(0); }
+.fb-embed-pill::before { content: "✦"; color: var(--gold); margin-right: .45rem; }
+.fb-embed-pill.done::before { content: ""; margin: 0; }
+
 .fb-doc-vidwrap { position: relative; }
 .fb-doc-vidwrap .fb-doc-vid { display: block; }
 .fb-doc-videxpand { position: absolute; top: .9rem; right: .6rem; width: 2rem; height: 2rem; display: flex; align-items: center; justify-content: center; border: none; border-radius: 8px; background: rgba(var(--shadow-rgb),.55); color: var(--fg-bright); font-size: 1rem; cursor: pointer; opacity: .8; }

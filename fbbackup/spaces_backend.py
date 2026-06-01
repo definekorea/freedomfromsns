@@ -339,13 +339,21 @@ class SpacesBackend:
         return self._index_dir if workspace == "default" else (self._index_dir / workspace)
 
     def _load_embeddings(self, workspace: str = "default") -> None:
-        if workspace in self._emb_cache:
+        # Reload when embeddings.npy appears or changes mtime, so a background embed
+        # (the wizard's Tier-1 job) lights up semantic search live — no restart.
+        d = self._emb_dir(workspace)
+        arr = d / "embeddings.npy"
+        try:
+            mtime = arr.stat().st_mtime if arr.is_file() else 0.0
+        except OSError:
+            mtime = 0.0
+        cached = self._emb_cache.get(workspace)
+        if cached is not None and cached.get("_mtime") == mtime:
             return
-        ent: dict = {"emb": None, "ids": None, "threshold": 0.62, "provider": "gemini"}
+        ent: dict = {"emb": None, "ids": None, "threshold": 0.62, "provider": "gemini", "_mtime": mtime}
         try:
             import numpy as np
-            d = self._emb_dir(workspace)
-            arr, ids, meta = d / "embeddings.npy", d / "embed-ids.json", d / "embed-meta.json"
+            ids, meta = d / "embed-ids.json", d / "embed-meta.json"
             if arr.is_file() and ids.is_file():
                 ent["emb"] = np.load(arr)
                 ent["ids"] = json.loads(ids.read_text(encoding="utf-8"))

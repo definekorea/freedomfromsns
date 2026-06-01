@@ -322,8 +322,11 @@ Reordered around the §0.1 ladder: **ship Tier 0 the fastest, make AI an unlock.
    `--embed local|gemini|skip` for non-interactive runs. (M) — done.
 5. **Mistral embedding provider** in `embed.py` (alongside gemini/weft/local) so the
    weak-hardware route offers Gemini **or** Mistral. (S)
-6. **Background, resumable embedding** surfaced as an in-app progress pill, so Tier 1
-   never blocks browse. (S–M; `embed` is already resumable.)
+6. ✅ **Background embedding + in-app progress pill** — `embed` writes live progress
+   (`embed-progress.json`); `/api/embed/status` reports ready / running(%) / none; the
+   viewer shows a build pill and a brief "ready" toast. The server **reloads
+   `embeddings.npy` on mtime change**, so semantic search lights up live — no restart.
+   (S–M) — done.
 7. **"Chat with your archive" (Tier 2)** unlock card + **Public mode** for the chat
    (throttle + topic-lock + cost cap) (§6). (M)
 8. ✅ **Publish button** in the UI (🌐) — warns to privatise sensitive posts and

@@ -193,6 +193,23 @@ def _ckpt_paths(out_dir: Path) -> tuple[Path, Path]:
     return out_dir / "embed-ckpt.npy", out_dir / "embed-ckpt.json"
 
 
+def _write_progress(out_dir: Path, done: int, total: int, provider: str, model: str) -> None:
+    """Live progress for the in-app pill (read by /api/embed/status). Best-effort."""
+    try:
+        (out_dir / "embed-progress.json").write_text(json.dumps(
+            {"done": done, "total": total, "provider": provider, "model": model,
+             "ts": time.time()}), encoding="utf-8")
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _clear_progress(out_dir: Path) -> None:
+    try:
+        (out_dir / "embed-progress.json").unlink(missing_ok=True)
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def _load_ckpt(out_dir: Path, fp: str) -> list[list[float]]:
     import numpy as np
     npy, js = _ckpt_paths(out_dir)
@@ -304,10 +321,13 @@ def embed(spaces_root: Path, out_dir: Path, workspace: str = "default") -> dict:
         print(f"resuming embed at {start}/{len(texts)} via {provider} (checkpoint) …", flush=True)
     else:
         print(f"embedding {len(texts)} rows via {provider} ({model}) …", flush=True)
+    _write_progress(out_dir, start, len(texts), provider, model)
     for i in range(start, len(texts), batch):
         vecs.extend(_embed_batch(provider, texts[i:i + batch], key))
         _save_ckpt(out_dir, fp, vecs, provider, model)  # checkpoint each batch
-        print(f"  …{min(i + batch, len(texts))}/{len(texts)}", flush=True)
+        done = min(i + batch, len(texts))
+        _write_progress(out_dir, done, len(texts), provider, model)  # live pill
+        print(f"  …{done}/{len(texts)}", flush=True)
 
     arr = np.asarray(vecs, dtype="float32")
     arr /= (np.linalg.norm(arr, axis=1, keepdims=True) + 1e-9)
@@ -318,6 +338,7 @@ def embed(spaces_root: Path, out_dir: Path, workspace: str = "default") -> dict:
         {"provider": provider, "model": model, "dim": int(arr.shape[1]),
          "count": len(ids), "threshold": thr}), encoding="utf-8")
     _clear_ckpt(out_dir)  # done → drop the resume checkpoint
+    _clear_progress(out_dir)  # done → embeddings.npy now signals "ready"
     print(f"saved {arr.shape} ({provider}) -> {out_dir / 'embeddings.npy'}", flush=True)
     return {"provider": provider, "count": len(ids), "dim": int(arr.shape[1])}
 

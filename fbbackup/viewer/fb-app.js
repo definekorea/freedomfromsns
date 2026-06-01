@@ -57,6 +57,7 @@
       pub_copy: "복사", pub_copied: "복사됨 ✓",
       pub_need_cf: "공개하려면 cloudflared가 필요합니다. 설치 안내:",
       pub_note: "이 컴퓨터와 앱이 켜져 있는 동안만 작동하는 임시 주소이며, 재시작하면 바뀝니다. 내 도메인의 고정 주소를 원하면 터미널에서 `ffs tunnel` 실행(무료 Cloudflare 계정 + 도메인 필요).",
+      embed_pill_building: "스마트 검색 만드는 중… {pct}%", embed_pill_ready: "✓ 스마트 검색 준비 완료",
     },
     en: {
       archive: "Archive", browse: "Browse", calendar: "Calendar", aichat: "✦ AI Chat",
@@ -99,6 +100,7 @@
       pub_copy: "Copy", pub_copied: "Copied ✓",
       pub_need_cf: "Publishing needs cloudflared. Install it:",
       pub_note: "A temporary link that works only while this computer and app are running, and changes on restart. For a stable address on your own domain, run `ffs tunnel` in a terminal (needs a free Cloudflare account + a domain).",
+      embed_pill_building: "Building smart search… {pct}%", embed_pill_ready: "✓ Smart search ready",
     },
   };
   function tr(k) { var d = I18N[S.lang] || I18N.ko; return k in d ? d[k] : (I18N.ko[k] != null ? I18N.ko[k] : k); }
@@ -209,6 +211,7 @@
     routeFromHash();
     window.addEventListener("hashchange", routeFromHash);
     installScrollPersistence();
+    startEmbedPill();   // show background smart-search build progress, if any
   }).catch(function () { els.main.innerHTML = '<div class="fb-empty">' + tr("load_fail") + '</div>'; });
 
   /* ── chrome (header + filters) built once ───────────────────────────── */
@@ -405,6 +408,35 @@
     stop.onclick = function () { stop.disabled = true; fetch("/api/publish/stop", { method: "POST" }).then(function () { renderPublishBody(); }); };
     els.pubBody.appendChild(stop);
   }
+
+  /* ── smart-search progress pill (background embedding from the setup wizard) ──
+     Polls /api/embed/status: shows a build-progress pill, a brief "ready" toast on
+     completion (semantic search then lights up — the server reloads embeddings live),
+     and nothing when there's no job. */
+  function startEmbedPill() {
+    var wasRunning = false;
+    (function tick() {
+      fetch("/api/embed/status").then(function (r) { return r.json(); }).then(function (s) {
+        if (s.state === "running") {
+          wasRunning = true;
+          showEmbedPill(tr("embed_pill_building").replace("{pct}", s.pct), false);
+          setTimeout(tick, 4000);
+        } else if (s.state === "ready") {
+          if (wasRunning) showEmbedPill(tr("embed_pill_ready"), true); else hideEmbedPill();
+        } else {
+          hideEmbedPill();   // none → stop polling
+        }
+      }).catch(function () { setTimeout(tick, 8000); });
+    })();
+  }
+  function showEmbedPill(text, done) {
+    if (!els.embedPill) { els.embedPill = el("div", "fb-embed-pill"); document.body.appendChild(els.embedPill); }
+    els.embedPill.textContent = text;
+    els.embedPill.classList.toggle("done", !!done);
+    els.embedPill.classList.add("on");
+    if (done) setTimeout(hideEmbedPill, 5000);
+  }
+  function hideEmbedPill() { if (els.embedPill) els.embedPill.classList.remove("on"); }
 
   function uniqueYears() { var s = {}; S.posts.forEach(function (p) { s[p.date.slice(0, 4)] = 1; }); return Object.keys(s).sort().reverse(); }
   // length-based text fit for text-only cards (a cheap stand-in for a measured
