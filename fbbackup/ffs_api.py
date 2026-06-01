@@ -47,6 +47,45 @@ _CHAT_SYS = (
 )
 
 
+# ── per-post privacy ────────────────────────────────────────────────────────
+# FB exports carry no audience, so every post's "original" is public (set in
+# parse.py → md frontmatter). The user marks individual posts private here; those
+# marks live in a sidecar in the index dir so they survive `ffs build` (which
+# rewrites the markdown). A post is private when its effective privacy != public;
+# private posts stay fully visible locally but are excluded from the shareable
+# static export (export_static.py).
+_OVERRIDES_NAME = "privacy-overrides.json"
+
+
+def _overrides_path(b):
+    return b._index_dir / _OVERRIDES_NAME
+
+
+def load_overrides(b) -> dict:
+    try:
+        return json.loads(_overrides_path(b).read_text("utf-8")) or {}
+    except Exception:  # noqa: BLE001  (missing / unreadable → none)
+        return {}
+
+
+def effective_privacy(props: dict, overrides: dict, post_id: str) -> str:
+    """Override wins over the parsed (always-public) frontmatter value."""
+    if post_id in overrides:
+        return overrides[post_id]
+    return str(props.get("privacy") or "public")
+
+
+def _save_override(b, post_id: str, privacy: str) -> None:
+    ov = load_overrides(b)
+    if privacy == "public":
+        ov.pop(post_id, None)        # public is the default → don't store it
+    else:
+        ov[post_id] = privacy
+    p = _overrides_path(b)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(ov, ensure_ascii=False, indent=0), "utf-8")
+
+
 def _plain(body: str) -> str:
     """The readable text of a row's md body — drop the H1, image/video/link/place
     markup. Used for the retrieval context (the model can't see images)."""
@@ -202,12 +241,15 @@ def register(app: FastAPI, b) -> None:
     @app.get("/api/index")
     def index():
         rows = b._ensure_index("default")["rows"]
+        overrides = load_overrides(b)
         out = []
         for r in rows:
             p = r["props"]
             date = str(p.get("date") or "")
             if not date:
                 continue
+            fbid = str(p.get("fb_id") or "")   # stable key for privacy overrides
+            private = effective_privacy(p, overrides, fbid) != "public"
             thumb, vid = "", bool(p.get("video_path"))
             img = p.get("image_path")
             if img:
@@ -220,12 +262,32 @@ def register(app: FastAPI, b) -> None:
                         "excerpt": r["summary"], "preview": r.get("preview", ""),
                         "thumb": thumb, "vid": vid,
                         "link_url": str(p.get("link_url") or ""),
+                        # private = excluded from the shareable static export only;
+                        # still fully visible in the local browser (a 🔒 badge).
+                        "private": private, "fbid": fbid,
                         # "empty": no media, no link, no real text (title==text) —
                         # nothing to show, hidden from every view. (Reshares are NOT
                         # empty-by-fiat anymore — they live in the 공유 bucket.)
                         "empty": bool(r.get("empty"))})
         out.sort(key=lambda r: r["date"], reverse=True)  # newest first
         return JSONResponse(out)
+
+    @app.post("/api/privacy")
+    async def set_privacy(request: Request):
+        """Mark one post public/private. Body: {fbid, privacy:'public'|'private'}.
+        Persists to the index-dir sidecar; gates the static export, not local view."""
+        try:
+            body = await request.json()
+        except Exception:  # noqa: BLE001
+            body = {}
+        fbid = str((body or {}).get("fbid") or "")
+        privacy = str((body or {}).get("privacy") or "public")
+        if not fbid:
+            return JSONResponse({"error": "no fbid"}, status_code=400)
+        if privacy not in ("public", "private"):
+            privacy = "public"
+        _save_override(b, fbid, privacy)
+        return {"fbid": fbid, "privacy": privacy, "private": privacy != "public"}
 
     @app.post("/api/search")
     async def search(request: Request):

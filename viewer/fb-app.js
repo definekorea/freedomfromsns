@@ -19,6 +19,7 @@
       related_searching: "  ·  관련 글 찾는 중…", semantic: "  ·  의미 검색",
       searching: "검색 중…", no_results: "결과가 없습니다.", no_results2: "결과 없음",
       close: "닫기", view_original: "원문 보기 ↗", loading: "불러오는 중…", prev: "이전", next: "다음",
+      public: "공개", private: "비공개", privacy_hint: "공개 설정 — 비공개 글은 공유·내보내기에서 제외됩니다 (내 컴퓨터에서는 계속 보입니다)",
       load_body_fail: "본문을 불러올 수 없습니다.", related: "관련 글", link_preview: "링크 미리보기…",
       source_fallback: "원본", lb_goto: "위치로 이동", original_short: "원문 ↗", untitled: "(무제)",
       chat_hi: "✦ 내 기록과 대화하기",
@@ -40,6 +41,7 @@
       related_searching: "  ·  finding related…", semantic: "  ·  semantic",
       searching: "Searching…", no_results: "No results.", no_results2: "No results",
       close: "Close", view_original: "View original ↗", loading: "Loading…", prev: "Previous", next: "Next",
+      public: "Public", private: "Private", privacy_hint: "Privacy — private posts are excluded from sharing/export (still visible on your computer)",
       load_body_fail: "Couldn't load the post.", related: "Related", link_preview: "Link preview…",
       source_fallback: "Source", lb_goto: "Jump to position", original_short: "Original ↗", untitled: "(untitled)",
       chat_hi: "✦ Chat with my archive",
@@ -284,6 +286,7 @@
     // list as shown — 전체 or 사진/영상/글/etc) so prev/next walks every item in it,
     // regardless of type. The detail's own image zoom still uses the lightbox strip.
     var c = el("div", "fb-card"); c.onclick = function () { openPost(p.id, contextIds()); };
+    if (p.private) { var lk = el("div", "fb-lock", "🔒"); lk.title = tr("privacy_hint"); c.appendChild(lk); }
     var isLink = p.type === "link" && p.link_url;
     var hasImage = !!p.thumb;
     var preview = (p.preview || p.excerpt || "").trim();
@@ -529,6 +532,20 @@
       nav.appendChild(el("div", "fb-doc-pos", (ctxPos + 1) + " / " + S.ctx.length));
       nav.appendChild(nx);
       bar.appendChild(nav);
+    }
+    // privacy toggle — private gates sharing/export only (still shown locally)
+    if (p && p.fbid) {
+      var pvb = el("button", "fb-doc-priv");
+      var setLbl = function () { pvb.textContent = p.private ? "🔒 " + tr("private") : "🌐 " + tr("public"); pvb.className = "fb-doc-priv" + (p.private ? " on" : ""); };
+      setLbl(); pvb.title = tr("privacy_hint");
+      pvb.onclick = function () {
+        var next = p.private ? "public" : "private";
+        fetch("/api/privacy", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fbid: p.fbid, privacy: next }) })
+          .then(function (r) { return r.json(); })
+          .then(function (res) { p.private = !!res.private; setLbl(); })
+          .catch(function () {});
+      };
+      bar.appendChild(pvb);
     }
     doc.appendChild(bar);
     var body = el("div", "fb-doc-body");

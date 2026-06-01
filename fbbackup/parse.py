@@ -239,6 +239,12 @@ def normalize_post(post: dict, subfolders, by_name, share_links: dict | None = N
         "fb_url": fb_url,
         "albums": [],
         "source": "facebook-export",
+        # FB's DYI export carries NO per-post audience/privacy (confirmed: not in
+        # JSON or HTML; see docs/facebook-export-research.md §1.4). So the "original"
+        # is unknowable — default to public. The user's per-post marks live in a
+        # separate privacy-overrides sidecar (survives re-parse/re-build); only
+        # non-public posts are excluded from the shareable static export.
+        "privacy": "public",
     }
 
 

@@ -64,6 +64,7 @@ def post_to_row(post: dict, source: str = "facebook-export") -> tuple[str, str]:
         "type": post["type"],
         "fb_id": post["fb_id"],
         "source": post.get("source") or source,
+        "privacy": post.get("privacy", "public"),  # original audience (always public — FB exports none)
     }
     if post["group"]:
         props["group"] = post["group"]
