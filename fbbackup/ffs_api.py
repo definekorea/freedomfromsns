@@ -28,9 +28,24 @@ from .embed import gemini_key
 
 # Gemini chat — the two UI-selectable tiers. Embeddings are fixed elsewhere
 # (gemini-embedding-001); this is the synthesis model only.
+#   • fast    = gemini-flash-latest (auto-tracks the newest Flash), thinking OFF
+#               → snappy + cheap.
+#   • precise = gemini-3.5-flash WITH thinking → near-Pro quality at Flash cost.
 _GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
-ALLOWED_MODELS = ("gemini-2.5-flash", "gemini-3.1-pro-preview")
-DEFAULT_MODEL = os.environ.get("FFS_CHAT_MODEL", "gemini-2.5-flash")
+FAST_MODEL = "gemini-flash-latest"
+PRECISE_MODEL = "gemini-3.5-flash"          # a thinking model
+ALLOWED_MODELS = (FAST_MODEL, PRECISE_MODEL)
+DEFAULT_MODEL = os.environ.get("FFS_CHAT_MODEL", FAST_MODEL)
+
+
+def lane_generation_config(model: str, temperature: float) -> dict:
+    """Per-lane generationConfig. The precise lane keeps thinking and gets a
+    bigger output budget so a reasoned answer doesn't truncate; every other lane
+    disables thinking (thinkingBudget 0) to stay fast + cheap."""
+    if model == PRECISE_MODEL:
+        return {"temperature": temperature, "maxOutputTokens": 8192}
+    return {"temperature": temperature, "maxOutputTokens": 4096,
+            "thinkingConfig": {"thinkingBudget": 0}}
 
 # md-body media/link markup (see spaces_writer.post_to_row): images and videos
 # are already `/api/fb/files?path=…` URLs; links are `🔗 [name](http…)`.
@@ -153,7 +168,7 @@ def _gemini_chat(messages: list[dict], system: str, model: str, key: str,
     body = json.dumps({
         "systemInstruction": {"parts": [{"text": system}]},
         "contents": contents,
-        "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.5},
+        "generationConfig": lane_generation_config(model, 0.5),
     }).encode()
     url = _GEMINI_URL.format(model=model, key=key)
     req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})

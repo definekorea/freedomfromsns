@@ -35,7 +35,7 @@
       chat_sub: "내 페이스북 기록을 근거로 답합니다. 사진·영상도 함께 찾아 보여줘요. 무엇이든 물어보세요.",
       chat_eg1: "내가 올린 여행 사진들 보여줘", chat_eg2: "내가 가장 많이 쓴 주제는?", chat_eg3: "2015년에 무슨 일이 있었지?",
       chat_ph: "메시지를 입력하세요…  (Enter 전송 · Shift+Enter 줄바꿈)",
-      send: "전송", ai_model: "AI 모델", model_fast: "빠름 (Flash)", model_precise: "정밀 (Pro)",
+      send: "전송", ai_model: "AI 모델", model_fast: "빠름", model_precise: "정밀 (사고)",
       tools: "🔧 도구", tools_title: "도구 사용(에이전트) — 기록을 직접 검색·열람해 더 정확히 답합니다",
       clear_chat: "대화 지우기", sources: "근거 글",
       copy: "복사", copied: "복사됨", copy_title: "답변 복사", regen: "다시", regen_title: "다시 생성",
@@ -61,7 +61,7 @@
       chat_sub: "Answers grounded in your Facebook archive — it finds your photos and videos too. Ask anything.",
       chat_eg1: "Show my travel photos", chat_eg2: "What did I write about most?", chat_eg3: "What happened in 2015?",
       chat_ph: "Type a message…  (Enter to send · Shift+Enter for a new line)",
-      send: "Send", ai_model: "AI model", model_fast: "Fast (Flash)", model_precise: "Precise (Pro)",
+      send: "Send", ai_model: "AI model", model_fast: "Fast", model_precise: "Precise (thinking)",
       tools: "🔧 Tools", tools_title: "Agent mode — searches and opens your posts directly for more accurate answers",
       clear_chat: "Clear chat", sources: "Sources",
       copy: "Copy", copied: "Copied", copy_title: "Copy answer", regen: "Retry", regen_title: "Regenerate",
@@ -1013,7 +1013,9 @@
   }
   /* ── AI chat (multi-turn, archive-grounded RAG; Gemini) ───────────────── */
   var CHAT_KEY = "ffs.chat.v1";
-  function modelLabel(m) { return /flash/i.test(m) ? tr("model_fast") : /pro/i.test(m) ? tr("model_precise") : m; }
+  // Both lanes are Flash now, so map by id: 3.5-flash = the thinking "precise"
+  // lane, everything else (flash-latest) = the fast lane.
+  function modelLabel(m) { return /3\.5-flash/.test(m) ? tr("model_precise") : (/pro/i.test(m) ? tr("model_precise") : tr("model_fast")); }
   function loadChat() { try { S.chat = JSON.parse(sessionStorage.getItem(CHAT_KEY) || "[]") || []; } catch (e) { S.chat = []; } }
   function saveChat() { try { sessionStorage.setItem(CHAT_KEY, JSON.stringify(S.chat.slice(-20))); } catch (e) { /* quota */ } }
 

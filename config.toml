@@ -6,7 +6,7 @@ root = "/mnt/d/dev/facebook-data"
 dir = "index"
 [gemini]
 # Chat model is selectable in the UI (flash ⇄ pro); this is the default.
-chat_model = "gemini-2.5-flash"
+chat_model = "gemini-flash-latest"
 [serve]
 host = "127.0.0.1"
 port = 8282

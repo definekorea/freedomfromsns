@@ -179,8 +179,9 @@ class _Turn:
 
 
 def _call(model: str, key: str, contents: list, use_tools: bool = True) -> dict:
+    from .ffs_api import lane_generation_config   # same per-lane thinking policy
     payload = {"systemInstruction": {"parts": [{"text": _SYS}]}, "contents": contents,
-               "generationConfig": {"temperature": 0.4, "maxOutputTokens": 4096}}
+               "generationConfig": lane_generation_config(model, 0.4)}
     if use_tools:
         payload["tools"] = _TOOLS
     body = json.dumps(payload).encode()

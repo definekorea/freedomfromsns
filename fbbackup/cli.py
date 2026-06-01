@@ -134,7 +134,7 @@ def cmd_serve(args) -> int:
     from fbbackup.ffs_server import serve
     p = _paths(args)
     cfg_serve = p["cfg"].get("serve", {})
-    chat_model = (p["cfg"].get("gemini", {}) or {}).get("chat_model", "gemini-2.5-flash")
+    chat_model = (p["cfg"].get("gemini", {}) or {}).get("chat_model", "gemini-flash-latest")
     host = args.host or os.environ.get("FBBACKUP_HOST") or cfg_serve.get("host", "127.0.0.1")
     port = int(args.port or os.environ.get("FBBACKUP_PORT") or cfg_serve.get("port", 8282))
     print(f"FreedomFromSNS → http://{host}:{port}  (chat: {chat_model}; Ctrl-C to stop)", flush=True)

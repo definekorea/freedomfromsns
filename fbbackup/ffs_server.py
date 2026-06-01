@@ -23,7 +23,7 @@ _VIEWER = _PKG.parent / "viewer"
 
 
 def create_app(spaces_root: Path, export_root: Path,
-               chat_model: str = "gemini-2.5-flash") -> FastAPI:
+               chat_model: str = "gemini-flash-latest") -> FastAPI:
     spaces_root = Path(spaces_root).expanduser()
     if not spaces_root.is_dir():
         raise SystemExit(f"No rows at {spaces_root} — run `ffs build` first.")
@@ -85,11 +85,11 @@ def _reload_app() -> FastAPI:
     """App factory for `--reload` (uvicorn must import the app by string).
     Reads the paths the parent stashed in the env before handing off."""
     return create_app(os.environ["FFS_SPACES"], os.environ["FFS_EXPORT"],
-                      os.environ.get("FFS_CHAT_MODEL", "gemini-2.5-flash"))
+                      os.environ.get("FFS_CHAT_MODEL", "gemini-flash-latest"))
 
 
 def serve(spaces_root: Path, export_root: Path, host: str = "127.0.0.1",
-          port: int = 8282, chat_model: str = "gemini-2.5-flash",
+          port: int = 8282, chat_model: str = "gemini-flash-latest",
           reload: bool = False) -> None:
     import uvicorn
     if reload:
