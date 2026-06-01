@@ -40,7 +40,16 @@ def create_app(spaces_root: Path, export_root: Path,
 
     @app.get("/", response_class=HTMLResponse)
     def home():
-        return (_VIEWER / "index.html").read_text(encoding="utf-8")
+        html = (_VIEWER / "index.html").read_text(encoding="utf-8")
+        # auto cache-bust the SPA assets by file mtime, so an edit is always
+        # picked up without a manual hard-reload (and stale CSS can't mislead).
+        for name in ("fb-app.css", "fb-app.js"):
+            try:
+                v = int((_VIEWER / name).stat().st_mtime)
+            except OSError:
+                v = 1
+            html = html.replace(f"/static/{name}", f"/static/{name}?v={v}")
+        return html
 
     app.mount("/static", StaticFiles(directory=_VIEWER), name="static")
     return app

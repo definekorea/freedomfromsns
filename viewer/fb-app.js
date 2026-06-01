@@ -394,6 +394,7 @@
         var imgs = content.querySelectorAll("img.fb-md-img");
         var media = []; imgs.forEach(function (im) { media.push({ url: im.getAttribute("src"), type: "image", post_id: id, post_title: obj.title || "" }); });
         imgs.forEach(function (im, ix) { im.style.cursor = "zoom-in"; im.onclick = function () { openLightbox(media, ix); }; });
+        appendLinkPreviews(content);
         appendRelated(doc, id);
       })
       .catch(function () {
@@ -419,6 +420,43 @@
       grid.appendChild(c);
     });
     rel.appendChild(grid); doc.appendChild(rel);
+  }
+
+  /* ── link previews (unfurl the original — shared links, reshared posts) ───
+     FreedomFromSNS isn't self-contained: when a post links out (Instagram /
+     YouTube / news / a Facebook permalink), fetch its Open-Graph preview and
+     show a rich card that opens the original. Server caches to disk + falls
+     back to the Wayback Machine for dead links. */
+  var unfurlCache = {};
+  function unfurl(u) {
+    if (!unfurlCache[u]) unfurlCache[u] = fetch(CFG.unfurl + "?url=" + encodeURIComponent(u))
+      .then(function (r) { return r.json(); }).catch(function () { return { ok: false, url: u }; });
+    return unfurlCache[u];
+  }
+  function decodeEnt(s) { if (!s) return ""; var t = el("textarea"); t.innerHTML = s; return t.value; }
+  function appendLinkPreviews(content) {
+    if (!CFG.unfurl) return;
+    var seen = {}, urls = [];
+    content.querySelectorAll('a[href^="http"]').forEach(function (a) {
+      var u = a.getAttribute("href"); if (u && !seen[u]) { seen[u] = 1; urls.push(u); }
+    });
+    if (!urls.length) return;
+    var wrap = el("div", "fb-prev-wrap"); content.appendChild(wrap);
+    urls.slice(0, 4).forEach(function (u) {
+      var card = el("a", "fb-prev loading"); card.href = u; card.target = "_blank"; card.rel = "noopener";
+      card.appendChild(el("div", "fb-prev-body", "링크 미리보기…"));
+      wrap.appendChild(card);
+      unfurl(u).then(function (d) {
+        card.classList.remove("loading"); card.innerHTML = "";
+        if (d && d.ok && d.image) { var im = el("img", "fb-prev-img"); im.loading = "lazy"; im.src = d.image; im.onerror = function () { im.remove(); }; card.appendChild(im); }
+        var b = el("div", "fb-prev-body");
+        var site = (d && d.ok && d.site) ? decodeEnt(d.site) : (function () { try { return new URL(u).hostname.replace(/^www\./, ""); } catch (e) { return "원본"; } })();
+        b.appendChild(el("div", "fb-prev-site", site + "  ↗"));
+        b.appendChild(el("div", "fb-prev-title", (d && d.ok && decodeEnt(d.title)) || u));
+        if (d && d.ok && d.description) b.appendChild(el("div", "fb-prev-desc", decodeEnt(d.description)));
+        card.appendChild(b);
+      });
+    });
   }
 
   // Open a post WITHOUT stacking history: first open pushes one entry; navigating
