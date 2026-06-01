@@ -46,10 +46,11 @@ STRINGS: dict[str, dict[str, str]] = {
         "smart_offer": "Smarter (meaning-based) search & AI chat are optional — "
                        "browsing and keyword search already work without any key.",
         "hw_gpu":   "  GPU detected: {name}. It can run a local model fast — no key needed.",
-        "hw_cpu":   "  No GPU detected. A local model still runs on the CPU (slower); "
-                    "for speed a free AI API key is recommended.",
-        "choose_embed": "Enable smart search? [1] local model (no key)  "
-                        "[2] AI API key (Gemini)  [3] skip for now (default {d}): ",
+        "hw_cpu":   "  No GPU detected — a local model still runs on the CPU (slower, but "
+                    "it works and stays private). Want it faster/stronger? Use an API key "
+                    "(Gemini, DeepSeek — free tiers work) — your choice.",
+        "choose_embed": "Enable smart search? [1] local model, no key  "
+                        "[2] API key — faster (Gemini/DeepSeek, free tiers)  [3] skip  (default {d}): ",
         "installing_local": "Installing the local model components (one time, a few minutes)…",
         "install_fail": "Couldn't install the local model automatically — skipping. "
                         "Browsing still works; enable smart search later in the app.",
@@ -60,9 +61,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "microbench": "Testing embedding speed on your hardware…",
         "embed_started_est": "Building the smart-search index in the background "
                              "(~{min} min on your hardware; see embed.log) — browse while it runs.",
-        "backoff_slow": "On this hardware, local smart search would take ~{min} min. "
-                        "Browsing + keyword search work now; for fast meaning-based search, "
-                        "connect a free AI key in the app (skipped the local model for now).",
+        "local_lowmem": "This machine is low on memory for a local model — keyword search "
+                        "works now; for AI features connect a free API key (Gemini, DeepSeek, …) "
+                        "in the app.",
         "embed_skip": "Skipped. You can enable smart search & chat anytime in the app.",
         "localchat_setup": "Setting up no-key local AI chat (EXAONE) in the background "
                            "(~1.5 GB, one time) — it'll be ready shortly; browse meanwhile.",
@@ -126,10 +127,11 @@ STRINGS: dict[str, dict[str, str]] = {
         "smart_offer": "더 똑똑한(의미 기반) 검색과 AI 대화는 선택입니다 — "
                        "둘러보기·키워드 검색은 키 없이도 이미 됩니다.",
         "hw_gpu":   "  GPU 감지됨: {name}. 로컬 모델을 빠르게 돌릴 수 있어요 — 키 불필요.",
-        "hw_cpu":   "  GPU가 없습니다. 로컬 모델은 CPU로도 되지만(느림), 빠르게 하려면 "
-                    "무료 AI API 키를 권장합니다.",
+        "hw_cpu":   "  GPU가 없습니다 — 로컬 모델이 CPU에서도 작동합니다(느리지만 되고, 비공개 "
+                    "유지). 더 빠르고 강력하게 원하면 API 키(Gemini, DeepSeek — 무료 티어 가능)를 "
+                    "쓰세요. 선택입니다.",
         "choose_embed": "스마트 검색을 켤까요? [1] 로컬 모델(키 불필요)  "
-                        "[2] AI API 키(Gemini)  [3] 지금은 건너뛰기 (기본 {d}): ",
+                        "[2] API 키 — 더 빠름(Gemini/DeepSeek, 무료 티어)  [3] 건너뛰기 (기본 {d}): ",
         "installing_local": "로컬 모델 구성요소를 설치하는 중… (최초 1회, 몇 분 걸릴 수 있어요)",
         "install_fail": "로컬 모델 자동 설치에 실패해 건너뜁니다. 둘러보기는 그대로 되고, "
                         "나중에 앱에서 스마트 검색을 켤 수 있어요.",
@@ -140,9 +142,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "microbench": "이 컴퓨터에서 임베딩 속도를 측정하는 중…",
         "embed_started_est": "백그라운드에서 스마트 검색 색인을 만드는 중입니다"
                              "(이 컴퓨터 기준 약 {min}분; embed.log) — 그 사이 둘러보세요.",
-        "backoff_slow": "이 컴퓨터에서는 로컬 스마트 검색에 약 {min}분이 걸립니다. "
-                        "둘러보기·키워드 검색은 지금 바로 되고, 빠른 의미 검색을 원하면 "
-                        "앱에서 무료 AI 키를 연결하세요(로컬 모델은 일단 건너뜀).",
+        "local_lowmem": "이 컴퓨터는 로컬 모델을 돌리기엔 메모리가 부족합니다 — 키워드 검색은 "
+                        "지금 됩니다. AI 기능을 원하면 앱에서 무료 API 키(Gemini, DeepSeek 등)를 "
+                        "연결하세요.",
         "embed_skip": "건너뛰었습니다. 스마트 검색·AI 대화는 언제든 앱에서 켤 수 있어요.",
         "localchat_setup": "백그라운드에서 무료 로컬 AI 대화(EXAONE)를 준비하는 중입니다"
                            "(최초 1회 약 1.5 GB) — 곧 준비됩니다. 그 사이 둘러보세요.",
@@ -407,19 +409,18 @@ def _ort_providers() -> list[str]:
 
 
 def detect_hardware() -> dict:
-    """GPU/CPU/RAM summary + a recommendation: 'local' when a CUDA GPU or Apple
-    Silicon is present (fast embeddings), else 'key' (local CPU embedding of a big
-    archive is slow). The micro-benchmark refines this empirically before committing."""
+    """GPU/CPU/RAM summary + a recommendation. Policy: default to LOCAL whenever the
+    machine can run a small model at all — slowness is acceptable (the user can pick
+    a faster API key if they want). So 'local' unless RAM is clearly too low to load
+    one (<~2.5 GB); the micro-benchmark then confirms it won't OOM. GPU/Apple Silicon
+    are always local."""
     import platform
     g = detect_gpu()
     apple = platform.system() == "Darwin" and platform.machine() in ("arm64", "aarch64")
     cuda = g["gpu"] or any("CUDA" in p for p in _ort_providers())
     cores = os.cpu_count() or 1
     avail = _available_mb()
-    # local is the default when there's a GPU/Apple Silicon, OR a capable multi-core
-    # CPU with headroom (the small model embeds ~24k in minutes there — the micro-
-    # benchmark still confirms before the long run). Weak/low-RAM → recommend a key.
-    local_ok = cuda or apple or (cores >= 4 and (avail == 0 or avail >= 2000))
+    local_ok = cuda or apple or (avail == 0 or avail >= 2500)   # can it load a small model?
     return {**g, "cpu": cores, "apple_silicon": apple, "available_mb": avail,
             "providers": _ort_providers(), "recommend": "local" if local_ok else "key"}
 
@@ -494,20 +495,20 @@ def micro_benchmark(model_id: str, sample: list[str], batch: int = 16, timeout: 
         return {"ok": False, "reason": str(e)[:80]}
 
 
-_MAX_LOCAL_MIN = 30   # if local embedding the whole archive would take longer, back off to a key
-
-
 def embed_viable(mb: dict, post_count: int, available_mb: int) -> tuple[bool, int]:
-    """From a micro-bench result, decide if local embedding is worth it, and the
-    estimated minutes for the whole archive. Backs off on failure, projected time
-    over ~30 min, or projected peak RAM over ~60% of what's available."""
+    """Can this machine RUN local embedding (even if slow)? Returns (runnable,
+    estimated minutes). Policy (per project direction): default to local whenever
+    the hardware can run it — slowness is acceptable and only *informs* the user
+    (they're free to choose a faster API key). So we gate ONLY on whether it can run
+    without crashing: the micro-bench succeeded and projected peak RAM fits in
+    memory. Time no longer flips the default."""
     if not mb.get("ok"):
         return (False, 0)
     tps = max(float(mb.get("tps") or 0), 0.01)
     est_min = max(1, round(post_count / tps / 60))
     peak = int(mb.get("peak_mb") or 0)
-    ram_ok = (available_mb <= 0) or (peak <= 0) or (peak < 0.6 * available_mb)
-    return (tps > 0 and est_min <= _MAX_LOCAL_MIN and ram_ok, est_min)
+    ram_ok = (available_mb <= 0) or (peak <= 0) or (peak < 0.85 * available_mb)
+    return (tps > 0 and ram_ok, est_min)
 
 
 def test_local(spaces_root: Path, post_count: int, hw: dict) -> dict:

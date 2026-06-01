@@ -309,22 +309,21 @@ def cmd_setup(args) -> int:
     if not choice:
         say("smart_offer")
         say("hw_gpu", name=hw["name"]) if hw["gpu"] else say("hw_cpu")
-        # The default comes from the hardware test, not a static guess: a GPU is
-        # reliably fast (default local); a capable CPU is uncertain, so we actually
-        # install + micro-benchmark the model on this archive and default to local
-        # only if it's fast enough; weak hardware defaults to skip (browse now,
-        # enable a key in-app later) — Enter-through never demands an API key.
-        default = "3"
-        if hw["gpu"]:
-            default = "1"
-        elif hw["recommend"] == "local":
-            say("microbench")
-            test = wiz.test_local(p["spaces"], post_count, hw)
-            if not test["deps"]:
-                say("install_fail")
-            elif not test["viable"]:
-                say("backoff_slow", min=test["est_min"])
-            default = "1" if test["viable"] else "3"
+        # Default to LOCAL whenever the machine can run a model — even if it's a bit
+        # slow. The no-key local path is the default; an API key is for users who
+        # WANT faster/stronger (their choice). We only fall back to skip-by-default
+        # when RAM is too low to load a model, or the micro-bench shows it would OOM.
+        default = "1"
+        if not hw["gpu"]:
+            if hw["recommend"] != "local":                 # RAM too low to load a model
+                default = "3"
+            else:
+                say("microbench")
+                test = wiz.test_local(p["spaces"], post_count, hw)
+                if not test["deps"]:
+                    say("install_fail"); default = "3"
+                elif not test["viable"]:                   # would OOM → can't run reliably
+                    say("local_lowmem"); default = "3"
         try:
             pick = input(wiz.t(lang, "choose_embed", d=default)).strip() or default
         except EOFError:
@@ -342,7 +341,7 @@ def cmd_setup(args) -> int:
                                        model=test["model"])
             say("embed_started_est", min=test.get("est_min", 0))
         elif test.get("deps"):
-            say("backoff_slow", min=test.get("est_min", 0))   # too slow / OOM-risk → steer to a key
+            say("local_lowmem")   # would OOM on this machine → keyword search + offer a key
         # Local path → also wire no-key local CHAT (EXAONE), downloaded in the
         # background so Tier 2 works offline too. Chosen because it's the strongest
         # small model on Korean (see docs/local-models.md); the chat route serves it.
