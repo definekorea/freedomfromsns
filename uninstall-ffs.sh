@@ -19,12 +19,13 @@ if [ -f "$HOME/Library/LaunchAgents/com.freedomfromsns.plist" ]; then
   rm -f "$HOME/Library/LaunchAgents/com.freedomfromsns.plist" 2>/dev/null || true
 fi
 
-# caches (auto-downloaded cloudflared)
-rm -rf "$HOME/.cache/ffs" 2>/dev/null || true
+# NB: we deliberately KEEP all Cloudflare bits so a reinstall reuses the same public
+# address — the config ($ARCHIVE_DIR/cloudflared.yml), the login/tunnel creds
+# (~/.cloudflared), and the downloaded cloudflared binary (~/.cache/ffs).
 
 # the program itself (uv-managed Python tool)
 uv tool uninstall freedomfromsns || true
 
 echo
-echo "Done. Your archive is preserved at: $ARCHIVE_DIR"
+echo "Done. Kept: your archive at $ARCHIVE_DIR + your Cloudflare address/login (reused on reinstall)."
 echo "If you also want the data gone, delete that folder yourself."

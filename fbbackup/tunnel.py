@@ -155,7 +155,27 @@ def write_config(home: Path, tid: str, hostname: str, port: int) -> Path:
     return cfg
 
 
-def run_command(home: Path, name: str) -> list[str]:
-    """The command that runs the tunnel using our dedicated config."""
+def run_command(home: Path) -> list[str]:
+    """Run the tunnel from our dedicated config (the config names the tunnel, so the
+    same saved address is reused — no id/name needed here)."""
     return [cloudflared() or "cloudflared", "tunnel", "--config",
-            str(home / "cloudflared.yml"), "run", name]
+            str(home / "cloudflared.yml"), "run"]
+
+
+def read_config(home: Path) -> dict:
+    """Parse a previously-saved ~/ffs/cloudflared.yml → {tunnel, hostname}. Survives
+    uninstall (it's in the data folder), so the public address is reused."""
+    f = home / "cloudflared.yml"
+    out: dict = {}
+    if f.is_file():
+        for line in f.read_text(encoding="utf-8").splitlines():
+            s = line.strip()
+            if s.startswith("tunnel:"):
+                out["tunnel"] = s.split(":", 1)[1].strip()
+            elif "hostname:" in s and "hostname" not in out:
+                out["hostname"] = s.split("hostname:", 1)[1].strip()
+    return out
+
+
+def tunnel_exists(tid: str) -> bool:
+    return bool(tid) and any(tunnel_id(t) == tid for t in list_tunnels())

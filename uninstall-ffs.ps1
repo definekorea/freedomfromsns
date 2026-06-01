@@ -15,12 +15,13 @@ foreach ($d in $dirs) { foreach ($n in $names) { Remove-Item (Join-Path $d $n) -
 Remove-Item "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\FreedomFromSNS.vbs" -Force -ErrorAction SilentlyContinue
 Remove-Item (Join-Path $ArchiveDir 'ffs-server.cmd') -Force -ErrorAction SilentlyContinue
 
-# caches (auto-downloaded cloudflared)
-Remove-Item -Recurse -Force "$env:LOCALAPPDATA\ffs" -ErrorAction SilentlyContinue
+# NB: we deliberately KEEP all Cloudflare bits so a reinstall reuses the same public
+# address — the config ($ArchiveDir\cloudflared.yml), the login/tunnel creds
+# (~\.cloudflared), and the downloaded cloudflared binary ($env:LOCALAPPDATA\ffs).
 
 # the program itself (uv-managed Python tool)
 uv tool uninstall freedomfromsns
 
 Write-Host ""
-Write-Host "Done. Your archive is preserved at: $ArchiveDir"
+Write-Host "Done. Kept: your archive at $ArchiveDir + your Cloudflare address/login (reused on reinstall)."
 Write-Host "If you also want the data gone, delete that folder yourself."

@@ -386,7 +386,7 @@ def cmd_uninstall(args) -> int:
     print("Removed:" if removed else "Nothing to remove (already clean).", flush=True)
     for r in removed:
         print(f"  - {r}")
-    print(f"\n✓ Your archive is preserved at: {home}", flush=True)
+    print(f"\n✓ Kept: your archive at {home} + your Cloudflare address/login (reused on reinstall).", flush=True)
     print("To remove the program itself, run:  uv tool uninstall freedomfromsns")
     return 0
 
@@ -446,6 +446,18 @@ def cmd_tunnel(args) -> int:
         return 2
     say("tn_intro")
 
+    # Reuse a previously-set address (config survives uninstall/reinstall in ~/ffs):
+    # if cloudflared.yml exists and its tunnel still exists in the account, just run it.
+    if not args.reconfigure and not args.hostname:
+        saved = tn.read_config(home)
+        if saved.get("hostname") and tn.tunnel_exists(saved.get("tunnel", "")):
+            say("tn_reuse", host=saved["hostname"])
+            print("   $ " + " ".join(tn.run_command(home)))
+            if args.run:
+                say("tn_running")
+                return subprocess.call(tn.run_command(home))
+            return 0
+
     if not tn.is_logged_in():
         say("tn_login")
         if not args.dry_run:
@@ -473,7 +485,7 @@ def cmd_tunnel(args) -> int:
         for c in (["cloudflared", "tunnel", "create", name],
                   ["cloudflared", "tunnel", "route", "dns", name, host],
                   ["# write config →", str(cfg_path)],
-                  tn.run_command(home, name)):
+                  tn.run_command(home)):
             print("   $ " + " ".join(c))
         return 0
 
@@ -488,11 +500,11 @@ def cmd_tunnel(args) -> int:
     cfg = tn.write_config(home, tn.tunnel_id(t), host, port)
     say("tn_ready", host=host, cfg=str(cfg))
     say("tn_run_hint")
-    print("   $ " + " ".join(tn.run_command(home, name)))
+    print("   $ " + " ".join(tn.run_command(home)))
     say("tn_service", cfg=str(cfg))
     if args.run:
         say("tn_running")
-        return subprocess.call(tn.run_command(home, name))
+        return subprocess.call(tn.run_command(home))
     return 0
 
 
@@ -691,6 +703,7 @@ def _build_parser() -> argparse.ArgumentParser:
     tn.add_argument("--port", help="local port to expose (default: serve port / 8282)")
     tn.add_argument("--lang", choices=["en", "ko"], help="language (default: OS locale)")
     tn.add_argument("--run", action="store_true", help="run the tunnel after setup")
+    tn.add_argument("--reconfigure", action="store_true", help="set up a new address even if one is saved")
     tn.add_argument("--dry-run", action="store_true", help="print the steps without creating anything")
     common(tn, index=True)
 

@@ -329,8 +329,11 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
   .fb-search { order: 3; margin-left: 0; flex-basis: 100%; }
   .fb-chat { height: calc(100vh - 132px); }
   .fb-chat-msg { max-width: 96%; }
-  .fb-cal { flex-direction: column; }
-  .fb-cal-side { width: auto; display: flex; flex-wrap: wrap; gap: .3rem; }
+  .fb-cal { flex-direction: column; gap: .6rem; }
+  /* years as a compact, horizontally-scrollable chip strip at the top (no vertical pile) */
+  .fb-cal-side { width: auto; display: flex; flex-wrap: nowrap; gap: .4rem; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: .35rem; scrollbar-width: thin; }
+  .fb-cal-y { display: inline-block; width: auto; white-space: nowrap; text-align: center; padding: .35rem .7rem; border: 1px solid var(--line); border-radius: 999px; font-size: .82rem; flex: none; }
+  .fb-cal-y.on { border-color: var(--red); }
   .fb-cell { min-height: 64px; }
   .fb-doc-body { padding: 1.2rem 1.1rem; }
 }

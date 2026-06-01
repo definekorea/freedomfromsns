@@ -79,6 +79,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "tn_route_fail": "Couldn't route DNS — is {host}'s domain on your Cloudflare account?",
         "tn_ready":  "✓ Permanent address ready: https://{host}  (config: {cfg})",
         "tn_run_hint": "Start it any time with — keep it running for the address to work:",
+        "tn_reuse":  "Reusing your saved address: https://{host}  (run `ffs tunnel --reconfigure` to change it)",
         "tn_running": "Running the tunnel now (Ctrl-C to stop)…",
         "tn_service": "For an always-on address (survives reboots), install it as a service: "
                       "`cloudflared --config {cfg} service install`.",
@@ -156,6 +157,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "tn_route_fail": "DNS 연결에 실패했습니다 — {host}의 도메인이 내 Cloudflare 계정에 있나요?",
         "tn_ready":  "✓ 고정 주소 준비 완료: https://{host}  (설정: {cfg})",
         "tn_run_hint": "다음 명령으로 실행하세요 — 주소가 작동하려면 켜져 있어야 합니다:",
+        "tn_reuse":  "저장된 주소를 다시 사용합니다: https://{host}  (바꾸려면 `ffs tunnel --reconfigure`)",
         "tn_running": "지금 터널을 실행합니다(Ctrl-C로 중지)…",
         "tn_service": "재부팅에도 항상 켜두려면 서비스로 설치하세요: "
                       "`cloudflared --config {cfg} service install`.",
@@ -591,7 +593,6 @@ def create_launcher(home: Path, name: str = "FreedomFromSNS", cli: str = "serve 
 def remove_app_artifacts(home: Path) -> list[str]:
     """Remove launchers, the auto-start entry, and caches — but NEVER the data home
     (data/index/archive/config/.env stay). Returns the paths removed."""
-    import shutil as _sh
     removed: list[str] = []
     names = ("FreedomFromSNS.cmd", "FreedomFromSNS.command", "FreedomFromSNS.sh",
              "FreedomFromSNS (Add data).cmd", "FreedomFromSNS (Add data).command",
@@ -608,18 +609,13 @@ def remove_app_artifacts(home: Path) -> list[str]:
                     pass
     if disable_autostart():
         removed.append("auto-start entry")
-    extra = [home / "ffs-server.cmd"]
-    cf = (Path(os.environ["LOCALAPPDATA"]) / "ffs") if (os.name == "nt" and os.environ.get("LOCALAPPDATA")) \
-        else (Path.home() / ".cache" / "ffs")
-    for f in extra:
-        if f.exists():
-            try:
-                f.unlink(); removed.append(str(f))
-            except Exception:  # noqa: BLE001
-                pass
-    if cf.exists():
+    # Remove the background-server launcher. We deliberately KEEP all Cloudflare bits
+    # so a reinstall reuses the same public address: ~/ffs/cloudflared.yml (config),
+    # ~/.cloudflared/ (login + tunnel creds), and the auto-downloaded cloudflared binary.
+    f = home / "ffs-server.cmd"
+    if f.exists():
         try:
-            _sh.rmtree(cf); removed.append(str(cf))
+            f.unlink(); removed.append(str(f))
         except Exception:  # noqa: BLE001
             pass
     return removed
