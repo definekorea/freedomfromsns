@@ -715,6 +715,7 @@
       // and EXCLUDE them from the gallery below so nothing shows up twice.
       var inlineSet = {};
       body.querySelectorAll("img.fb-md-img").forEach(function (im) {
+        im.addEventListener("load", chatImgLoaded);
         var src = im.getAttribute("src"); inlineSet[src] = 1;
         var idx = mediaIndex(media, src);
         if (idx >= 0) { im.style.cursor = "zoom-in"; im.onclick = function () { openLightbox(media, idx); }; }
@@ -724,7 +725,7 @@
       var PREV = 11;  // up to 12 tiles; the 12th is "+N" if there are more
       gmedia.slice(0, gmedia.length > 12 ? PREV : 12).forEach(function (item) {
         var cell = el("div", "fb-media-cell" + (item.type === "video" ? " vid" : ""));
-        var im = el("img"); im.loading = "lazy"; im.src = item.url; im.alt = item.post_title || "";
+        var im = el("img"); im.loading = "lazy"; im.src = item.url; im.alt = item.post_title || ""; im.addEventListener("load", chatImgLoaded);
         im.onerror = function () { cell.remove(); }; cell.appendChild(im);
         if (item.type === "video") cell.appendChild(el("span", "fb-media-play", "▶"));
         cell.onclick = function () { openLightbox(media, mediaIndex(media, item.url)); };
@@ -777,6 +778,10 @@
     redrawChat(); sendRequest();
   }
   function scrollChat() { if (els.chatLog) els.chatLog.scrollTop = els.chatLog.scrollHeight; }
+  // chat images load late (after the bubble renders) and grow the log; re-snap to
+  // the bottom when one loads IF the user is already near the bottom (don't yank
+  // them back if they've scrolled up to read).
+  function chatImgLoaded() { if (els.chatLog && (els.chatLog.scrollHeight - els.chatLog.scrollTop - els.chatLog.clientHeight) < 160) scrollChat(); }
   function redrawChat() {
     if (!els.chatLog) { renderChat(); return; }
     els.chatLog.innerHTML = "";
