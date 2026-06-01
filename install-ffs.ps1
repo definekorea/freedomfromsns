@@ -17,7 +17,11 @@ $ErrorActionPreference = 'Stop'
 # latest GitHub Release wheel (no PyPI, no git, no clone — uv installs the wheel
 # straight from its HTTPS URL; irm parses the release JSON natively).
 $Repo = if ($env:FFS_REPO) { $env:FFS_REPO } else { 'definekorea/freedomfromsns' }
-$ScriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
+# NB: via `irm | iex` there's no script file, so $PSScriptRoot AND
+# $MyInvocation.MyCommand.Path are null — guard before Split-Path (else it throws
+# "Cannot bind argument to parameter 'Path' because it is null") and fall through
+# to the GitHub-release source, which is what the one-liner wants.
+$ScriptDir = if ($PSScriptRoot) { $PSScriptRoot } elseif ($MyInvocation.MyCommand.Path) { Split-Path -Parent $MyInvocation.MyCommand.Path } else { $null }
 if ($env:FFS_SOURCE) {
   $Source = $env:FFS_SOURCE
 } elseif ($ScriptDir -and (Test-Path (Join-Path $ScriptDir 'pyproject.toml'))) {
