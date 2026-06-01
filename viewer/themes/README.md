@@ -3,8 +3,18 @@
 The entire look of FreedomFromSNS is driven by **design tokens** (CSS custom
 properties). A **theme is one JSON file** in this folder that sets those tokens;
 the whole stylesheet flows from them, so a single file repaints everything.
-Switch themes with the 🎨 button in the filter bar (it cycles; the choice
-persists). Add a theme by dropping a `.json` here — no code, no restart.
+Pick a theme from the 🎨 menu in the filter bar (a swatch + name per theme;
+the choice persists). Add a theme by dropping a `.json` here — no code, no
+restart.
+
+**Shipped set (18):** `00-default` Gold Noir, then five major-site palettes
+(Google, Amazon, Facebook, YouTube, Yahoo), two from reference images
+(Mocha Mousse, Neon), and ten from Framer's *10 elegant palettes* (Earth Tones,
+Vibrant Greens, Warm Neutrals, Maroon Mood, Bold Orange, Cool Blues, Minimal,
+Pastels, Vibrant Blues, Power Purple). All are **dark interpretations** — each
+takes its palette's signature color as the accent and tunes the base/surfaces
+to that hue (so brand/image themes override `bg`/`bg2`/`bg3`/`line` too, not
+just the accent).
 
 ---
 
@@ -75,10 +85,11 @@ so tints and shadows — written `rgba(var(--x-rgb), a)` — re-tint with the th
 | `font-base` | UI + body font stack |
 | `font-display` | brand + calendar-title display font stack |
 
-> "Accent themes" (Emerald / Azure / Crimson) override just
-> `gold` + `gold-rgb` + `accent` + `on-accent` (+ a tuned `brand-fg`). Because
-> tints use `var(--gold-rgb)`, the whole accent system — solids **and** tints —
-> recolors coherently from those four values.
+> A minimal "accent-only" theme overrides just `gold` + `gold-rgb` + `accent` +
+> `on-accent` (+ a tuned `brand-fg`). Because tints use `var(--gold-rgb)`, the
+> whole accent system — solids **and** tints — recolors coherently from those
+> four values. The shipped brand/image themes go further and also retune the
+> surfaces (`bg`/`bg2`/`bg3`/`line`) to sit in the palette's hue.
 
 ---
 

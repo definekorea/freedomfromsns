@@ -1,0 +1,16 @@
+{
+  "name": "Earth Tones",
+  "tokens": {
+    "bg": "#14120d",
+    "bg-rgb": "20,18,13",
+    "bg2": "#1c1913",
+    "bg3": "#26221a",
+    "line": "#312b20",
+    "gold": "#e1937d",
+    "gold-rgb": "225,147,125",
+    "accent": "#ecb3a3",
+    "on-accent": "#1f0f0a",
+    "brand-fg": "#ece4d6",
+    "green": "#8e9867"
+  }
+}

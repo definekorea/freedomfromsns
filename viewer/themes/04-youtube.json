@@ -1,0 +1,17 @@
+{
+  "name": "YouTube",
+  "tokens": {
+    "bg": "#0f0f0f",
+    "bg-rgb": "15,15,15",
+    "bg2": "#1f1f1f",
+    "bg3": "#272727",
+    "line": "#303030",
+    "gold": "#ff0000",
+    "gold-rgb": "255,0,0",
+    "accent": "#ff4d4d",
+    "on-accent": "#ffffff",
+    "brand-fg": "#f1f1f1",
+    "red": "#ff0000",
+    "red-rgb": "255,0,0"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "Neon",
+  "tokens": {
+    "bg": "#08080c",
+    "bg-rgb": "8,8,12",
+    "bg2": "#101018",
+    "bg3": "#16161f",
+    "line": "#24242f",
+    "gold": "#00c0ff",
+    "gold-rgb": "0,192,255",
+    "accent": "#5ad6ff",
+    "on-accent": "#021016",
+    "brand-fg": "#e6f2f7",
+    "green": "#32cd32",
+    "blue": "#00c0ff"
+  }
+}

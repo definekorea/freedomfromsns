@@ -1,0 +1,15 @@
+{
+  "name": "Vibrant Greens",
+  "tokens": {
+    "bg": "#0e1a1c",
+    "bg-rgb": "14,26,28",
+    "bg2": "#122023",
+    "bg3": "#18292c",
+    "line": "#213a3e",
+    "gold": "#cdee84",
+    "gold-rgb": "205,238,132",
+    "accent": "#e1fcad",
+    "on-accent": "#10160a",
+    "brand-fg": "#e9f0dd"
+  }
+}

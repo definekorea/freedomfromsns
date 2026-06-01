@@ -1,0 +1,15 @@
+{
+  "name": "Bold Orange",
+  "tokens": {
+    "bg": "#140d06",
+    "bg-rgb": "20,13,6",
+    "bg2": "#1d130a",
+    "bg3": "#271a0e",
+    "line": "#332113",
+    "gold": "#ff5c00",
+    "gold-rgb": "255,92,0",
+    "accent": "#ff854d",
+    "on-accent": "#1a0c02",
+    "brand-fg": "#f0e6da"
+  }
+}

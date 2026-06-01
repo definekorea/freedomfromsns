@@ -1,0 +1,15 @@
+{
+  "name": "Minimal",
+  "tokens": {
+    "bg": "#101014",
+    "bg-rgb": "16,16,20",
+    "bg2": "#1a1a20",
+    "bg3": "#24242c",
+    "line": "#2e2e38",
+    "gold": "#cdced9",
+    "gold-rgb": "205,206,217",
+    "accent": "#e2e3ec",
+    "on-accent": "#14141a",
+    "brand-fg": "#e6e6ec"
+  }
+}

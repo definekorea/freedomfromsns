@@ -1,0 +1,17 @@
+{
+  "name": "Warm Neutrals",
+  "tokens": {
+    "bg": "#160f0a",
+    "bg-rgb": "22,15,10",
+    "bg2": "#1f1610",
+    "bg3": "#2a1e16",
+    "line": "#34261b",
+    "gold": "#c2986a",
+    "gold-rgb": "194,152,106",
+    "accent": "#dcb888",
+    "on-accent": "#1a1109",
+    "brand-fg": "#ece0d2",
+    "red": "#a8481f",
+    "red-rgb": "168,72,31"
+  }
+}

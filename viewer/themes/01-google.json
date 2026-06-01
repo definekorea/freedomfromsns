@@ -1,0 +1,19 @@
+{
+  "name": "Google",
+  "tokens": {
+    "bg": "#0d0e10",
+    "bg-rgb": "13,14,16",
+    "bg2": "#16171a",
+    "bg3": "#1d1e22",
+    "line": "#26272c",
+    "gold": "#4285f4",
+    "gold-rgb": "66,133,244",
+    "accent": "#6fa3f7",
+    "on-accent": "#ffffff",
+    "brand-fg": "#e8eaed",
+    "red": "#ea4335",
+    "red-rgb": "234,67,53",
+    "blue": "#4285f4",
+    "green": "#34a853"
+  }
+}

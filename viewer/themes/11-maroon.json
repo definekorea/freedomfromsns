@@ -1,0 +1,15 @@
+{
+  "name": "Maroon Mood",
+  "tokens": {
+    "bg": "#1a1212",
+    "bg-rgb": "26,18,18",
+    "bg2": "#221717",
+    "bg3": "#2c1f1f",
+    "line": "#382828",
+    "gold": "#c46b6b",
+    "gold-rgb": "196,107,107",
+    "accent": "#d88f8f",
+    "on-accent": "#1a0a0a",
+    "brand-fg": "#ecdede"
+  }
+}

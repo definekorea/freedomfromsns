@@ -1,0 +1,15 @@
+{
+  "name": "Power Purple",
+  "tokens": {
+    "bg": "#1a1320",
+    "bg-rgb": "26,19,32",
+    "bg2": "#231a2c",
+    "bg3": "#2e2238",
+    "line": "#3a2c47",
+    "gold": "#f2d0c4",
+    "gold-rgb": "242,208,196",
+    "accent": "#f8e0d8",
+    "on-accent": "#1a0f14",
+    "brand-fg": "#ece2ea"
+  }
+}

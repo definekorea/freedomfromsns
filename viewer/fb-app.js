@@ -121,6 +121,30 @@
     applyTheme(t[S.theme].tokens);
     if (els.themeBtn) els.themeBtn.title = tr("theme") + ": " + t[S.theme].name;
   }
+  // Theme picker popover — a swatch + name per theme (too many to blind-cycle).
+  function openThemeMenu(anchor) {
+    if (!els.themeMenu) {
+      els.themeMenu = el("div", "fb-theme-menu");
+      document.body.appendChild(els.themeMenu);
+      document.addEventListener("click", closeThemeMenu);
+      document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeThemeMenu(); });
+    }
+    var t = THEMES();
+    els.themeMenu.innerHTML = "";
+    t.forEach(function (th, i) {
+      var row = el("button", "fb-theme-row" + (i === S.theme ? " on" : ""));
+      var sw = el("span", "fb-theme-sw"); sw.style.background = (th.tokens && (th.tokens.gold || th.tokens.accent)) || "var(--gold)";
+      row.appendChild(sw); row.appendChild(el("span", "fb-theme-name", th.name));
+      row.onclick = function (e) { e.stopPropagation(); setTheme(i); closeThemeMenu(); };
+      els.themeMenu.appendChild(row);
+    });
+    var r = anchor.getBoundingClientRect();
+    els.themeMenu.style.top = (r.bottom + 6) + "px";
+    els.themeMenu.style.right = Math.max(8, window.innerWidth - r.right) + "px";
+    els.themeMenu.classList.add("on");
+  }
+  function closeThemeMenu() { if (els.themeMenu) els.themeMenu.classList.remove("on"); }
+  function toggleThemeMenu(a) { (els.themeMenu && els.themeMenu.classList.contains("on")) ? closeThemeMenu() : openThemeMenu(a); }
   // Brand wordmark: FreedomFromSNS with the F · F · S (Freedom · From · SNS)
   // picked out as accents — the "FFS" reads out of the full name.
   function brandWordmark() {
@@ -240,7 +264,7 @@
     var themeBtn = el("button", "fb-theme"); els.themeBtn = themeBtn;
     themeBtn.title = tr("theme") + ": " + THEMES()[S.theme % THEMES().length].name;
     themeBtn.innerHTML = '🎨';
-    themeBtn.onclick = function () { setTheme(S.theme + 1); };
+    themeBtn.onclick = function (e) { e.stopPropagation(); toggleThemeMenu(themeBtn); };
     els.filters.appendChild(themeBtn);
     var lang = el("button", "fb-lang", EN() ? "🇰🇷 한국어" : "🇺🇸 English");
     lang.title = EN() ? "한국어로 전환" : "Switch to English";

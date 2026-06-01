@@ -1,0 +1,15 @@
+{
+  "name": "Vibrant Blues",
+  "tokens": {
+    "bg": "#021a2e",
+    "bg-rgb": "2,26,46",
+    "bg2": "#07263d",
+    "bg3": "#0e3047",
+    "line": "#184259",
+    "gold": "#5eb2f2",
+    "gold-rgb": "94,178,242",
+    "accent": "#8cc8f7",
+    "on-accent": "#021019",
+    "brand-fg": "#d6e8f5"
+  }
+}

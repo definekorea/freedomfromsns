@@ -1,0 +1,15 @@
+{
+  "name": "Yahoo",
+  "tokens": {
+    "bg": "#15101d",
+    "bg-rgb": "21,16,29",
+    "bg2": "#1d1726",
+    "bg3": "#261d33",
+    "line": "#322745",
+    "gold": "#6f1fe0",
+    "gold-rgb": "111,31,224",
+    "accent": "#a96cff",
+    "on-accent": "#ffffff",
+    "brand-fg": "#e7ddf5"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "Mocha Mousse",
+  "tokens": {
+    "bg": "#15110d",
+    "bg-rgb": "21,17,13",
+    "bg2": "#1e1812",
+    "bg3": "#28201a",
+    "line": "#332921",
+    "gold": "#bd7a4a",
+    "gold-rgb": "189,122,74",
+    "accent": "#e0c39a",
+    "on-accent": "#1a1208",
+    "brand-fg": "#ddd0bf"
+  }
+}

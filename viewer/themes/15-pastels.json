@@ -1,0 +1,17 @@
+{
+  "name": "Pastels",
+  "tokens": {
+    "bg": "#14131a",
+    "bg-rgb": "20,19,26",
+    "bg2": "#1d1b24",
+    "bg3": "#26242f",
+    "line": "#322f3c",
+    "gold": "#b49cc0",
+    "gold-rgb": "180,156,192",
+    "accent": "#cbb6d6",
+    "on-accent": "#16101a",
+    "brand-fg": "#e2dce6",
+    "green": "#6f9954",
+    "blue": "#88a4b8"
+  }
+}

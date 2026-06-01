@@ -1,0 +1,15 @@
+{
+  "name": "Cool Blues",
+  "tokens": {
+    "bg": "#0b1a1d",
+    "bg-rgb": "11,26,29",
+    "bg2": "#122427",
+    "bg3": "#1a3034",
+    "line": "#24454a",
+    "gold": "#7cbcc4",
+    "gold-rgb": "124,188,196",
+    "accent": "#a5d6db",
+    "on-accent": "#08161a",
+    "brand-fg": "#d8e6e8"
+  }
+}
