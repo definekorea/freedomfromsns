@@ -110,7 +110,7 @@
   function routeFromHash() {
     if (!els.main) buildChrome();
     var h = location.hash.slice(1);
-    if (h.indexOf("post/") === 0) { openDetail(h.slice(5)); return; }
+    if (h.indexOf("post/") === 0) { var pid = h.slice(5); try { pid = decodeURIComponent(pid); } catch (e) {} openDetail(pid); return; }
     closeModal();
     var eq = h.indexOf("="), view = eq >= 0 ? h.slice(0, eq) : h;
     var q = "";
@@ -284,14 +284,21 @@
       for (var i = 0; i < start; i++) g.appendChild(el("div", "fb-cell empty"));
       for (var d = 1; d <= days; d++) {
         var ds = S.cal.y + "-" + ("0" + S.cal.m).slice(-2) + "-" + ("0" + d).slice(-2);
-        var cell = el("div", "fb-cell"); cell.appendChild(el("div", "fb-cell-n", String(d)));
-        (byDate[ds] || []).slice(0, 5).forEach(function (p) {
+        var dayItems = byDate[ds] || [];
+        var cell = el("div", "fb-cell" + (dayItems.length ? " has" : ""));
+        var n = el("div", "fb-cell-n", String(d));
+        if (dayItems.length) { n.onclick = dayClicker(ds, dayItems); }  // expand the day
+        cell.appendChild(n);
+        dayItems.slice(0, 4).forEach(function (p) {
           var a = el("div", "fb-ev " + p.type, p.title || "(무제)"); a.title = p.excerpt || p.title || "";
           a.onclick = function () { openPost(p.id); };
           cell.appendChild(a);
         });
-        var extra = (byDate[ds] || []).length - 5;
-        if (extra > 0) cell.appendChild(el("div", "fb-more", "+" + extra));
+        if (dayItems.length > 4) {
+          var more = el("div", "fb-more", "+" + (dayItems.length - 4) + " 더보기");
+          more.onclick = dayClicker(ds, dayItems);
+          cell.appendChild(more);
+        }
         g.appendChild(cell);
       }
       main.appendChild(g);
@@ -299,6 +306,41 @@
     wrap.appendChild(main); els.main.appendChild(wrap);
   }
   function step(d) { var m = S.cal.m + d, y = S.cal.y; if (m < 1) { m = 12; y--; } if (m > 12) { m = 1; y++; } S.cal = { y: y, m: m }; renderCalendar(); }
+
+  /* ── day panel: expand a crowded calendar day into a clean, scrollable list
+     you can click through, then collapse (× / Esc / backdrop) ─────────────── */
+  function dayClicker(ds, items) { return function (e) { if (e) e.stopPropagation(); openDayPanel(ds, items); }; }
+  function buildDayPanel() {
+    els.dayPop = el("div", "fb-daypop");
+    var card = el("div", "fb-daypop-card");
+    var bar = el("div", "fb-daypop-bar");
+    els.dayPopTitle = el("div", "fb-daypop-title");
+    var x = el("button", "fb-x", "×"); x.title = "닫기"; x.onclick = closeDayPanel;
+    bar.appendChild(els.dayPopTitle); bar.appendChild(x);
+    els.dayPopList = el("div", "fb-daypop-list");
+    card.appendChild(bar); card.appendChild(els.dayPopList);
+    els.dayPop.appendChild(card);
+    els.dayPop.addEventListener("click", function (e) { if (e.target === els.dayPop) closeDayPanel(); });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape" && els.dayPop && els.dayPop.classList.contains("on")) closeDayPanel(); });
+    document.body.appendChild(els.dayPop);
+  }
+  function openDayPanel(ds, items) {
+    if (!els.dayPop) buildDayPanel();
+    els.dayPopTitle.textContent = ds + "  ·  " + items.length + "개";
+    els.dayPopList.innerHTML = "";
+    items.forEach(function (p) {
+      var row = el("div", "fb-agenda-row");
+      row.appendChild(el("span", "fb-badge " + p.type, TYPE[p.type] || "글"));
+      var t = el("span", "fb-agenda-t", p.title || "(무제)");
+      row.appendChild(t);
+      if (p.thumb) { var im = el("img", "fb-daypop-thumb"); im.loading = "lazy"; im.src = p.thumb; im.onerror = function () { im.remove(); }; row.appendChild(im); }
+      row.onclick = function () { closeDayPanel(); openPost(p.id); };
+      els.dayPopList.appendChild(row);
+    });
+    els.dayPop.classList.add("on"); document.body.style.overflow = "hidden";
+    els.dayPopList.scrollTop = 0;
+  }
+  function closeDayPanel() { if (els.dayPop) els.dayPop.classList.remove("on"); document.body.style.overflow = ""; }
 
   /* ── detail modal (lazy WP REST) ────────────────────────────────────── */
   function buildModal() {
@@ -341,9 +383,12 @@
         body.innerHTML = "";
         body.appendChild(el("h1", null, obj.title || (p ? p.title : "")));
         var content = el("div", "fb-doc-md");
-        // strip the leading "# title" (shown as <h1> above) then render markdown;
-        // archive images are /api/fb/files URLs, made lightbox-clickable below.
-        var md = (obj.content_markdown || "").replace(/^#\s+.*\n+/, "");
+        // drop YAML frontmatter + the leading "# title" (shown as <h1> above),
+        // then render markdown; archive images are /api/fb/files URLs, made
+        // lightbox-clickable below.
+        var md = (obj.content_markdown || "")
+          .replace(/^---\n[\s\S]*?\n---\n+/, "")
+          .replace(/^#\s+.*\n+/, "");
         content.innerHTML = mdToHtml(md);
         body.appendChild(content);
         var imgs = content.querySelectorAll("img.fb-md-img");

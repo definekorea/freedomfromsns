@@ -215,6 +215,7 @@ def register(app: FastAPI, b) -> None:
             out.append({"id": r["id"], "date": date, "title": r["title"],
                         "type": str(p.get("type") or "status"),
                         "excerpt": r["summary"], "thumb": thumb, "url": ""})
+        out.sort(key=lambda r: r["date"], reverse=True)  # newest first
         return JSONResponse(out)
 
     @app.post("/api/search")

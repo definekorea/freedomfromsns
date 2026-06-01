@@ -266,3 +266,19 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
 .fb-chat-agent { align-self: center; background: #1c1c20; color: #9aa; border: 1px solid #34343a; border-radius: 8px; padding: .4rem .6rem; font-size: .8rem; cursor: pointer; white-space: nowrap; }
 .fb-chat-agent.on { background: #1d3b2f; color: #6ee7b7; border-color: #2f6f54; }
 .fb-doc-md img.fb-md-img { max-width: 100%; border-radius: 8px; margin: .5rem 0; cursor: zoom-in; }
+
+/* calendar day expansion */
+.fb-cell.has .fb-cell-n { cursor: pointer; }
+.fb-cell.has .fb-cell-n:hover { color: var(--accent, #f5c451); }
+.fb-more { cursor: pointer; font-size: .7rem; color: #8a8a90; padding: 1px 3px; border-radius: 4px; }
+.fb-more:hover { color: var(--accent, #f5c451); background: rgba(255,255,255,.05); }
+.fb-daypop { position: fixed; inset: 0; z-index: 150; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; padding: 2rem; }
+.fb-daypop.on { display: flex; }
+.fb-daypop-card { background: #18181c; border: 1px solid #2c2c32; border-radius: 14px; width: min(560px, 100%); max-height: 80vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+.fb-daypop-bar { display: flex; align-items: center; justify-content: space-between; padding: .9rem 1.1rem; border-bottom: 1px solid #2c2c32; }
+.fb-daypop-title { font-weight: 600; font-size: .95rem; }
+.fb-daypop-list { overflow-y: auto; padding: .4rem; }
+.fb-daypop-list .fb-agenda-row { display: flex; align-items: center; gap: .6rem; padding: .55rem .7rem; border-radius: 8px; cursor: pointer; }
+.fb-daypop-list .fb-agenda-row:hover { background: rgba(255,255,255,.05); }
+.fb-daypop-list .fb-agenda-t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fb-daypop-thumb { width: 40px; height: 40px; object-fit: cover; border-radius: 6px; flex: 0 0 auto; }
