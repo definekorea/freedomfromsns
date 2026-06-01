@@ -153,15 +153,22 @@ small-model findings above are the foundation for the on-device-processing quest
    (`mini` for CPU, `large` = multilingual-e5 for GPU; jina-v3/nomic/bge-small ruled
    out) and a model-aware "related" threshold. The hardware tester (probe →
    micro-bench → back-off) selects the model and confirms viability. (S) — done.
-2. ✅ **Ternary Bonsai 1.7B local chat** — built (`fbbackup/localchat.py` + `ffs
-   localchat`). We download a prebuilt `llama-server` from PrismML's llama.cpp fork
-   (release `prism-b8846-d104cf1`; has the Q2_0 ternary kernels — no compiler), plus
-   the `Ternary-Bonsai-1.7B-Q2_0` GGUF, run a loopback OpenAI server (:8284), and add
-   a no-key `bonsai` chat provider; the existing RAG path uses it unchanged. Validated
-   on Linux (binary downloads/extracts/runs). RAG-only; weak on Korean — an offline/
-   low-power option, prefer a Gemini key for quality. Ollama remains a manual option.
-3. Fold a hardware-gated **opt-in offer** into the setup wizard once it's confirmed
-   to run acceptably on a low-powered device. (next)
+2. ✅ **No-key local chat** — built (`fbbackup/localchat.py` + `ffs localchat`). We
+   download a prebuilt `llama-server` (PrismML's llama.cpp fork, `prism-b8846-d104cf1`;
+   carries the Q2_0 ternary kernels AND runs ordinary GGUFs — no compiler), run a
+   loopback OpenAI server (:8284), and expose a no-key `local` chat provider the RAG
+   path uses unchanged. Three curated models, switchable via `ffs localchat --model`:
+   - **exaone** (default) — LG **EXAONE-3.5-2.4B-Instruct** Q4_K_M (~1.5 GB). Tested:
+     correct Korean RAG (persia/iran + Jeju) with the most natural Korean. Best for a
+     Korean archive.
+   - **qwen3** — **Qwen3-1.7B** Q8 (~1.8 GB), multilingual; launched `--reasoning off`
+     so it replies directly. Also correct on the Korean RAG tests.
+   - **bonsai** — **Ternary-Bonsai-1.7B** Q2_0 (~0.45 GB), ultralight/English; FAILED
+     the Korean RAG tests (English-centric). Kept for low-end/English use only.
+   Validated end-to-end on Linux (download/extract/run/switch/chat). RAG-only; for top
+   quality a Gemini key still wins.
+3. Fold a hardware-gated **opt-in offer** into the setup wizard once confirmed on a
+   low-powered device. (next)
 
 ## Sources
 - PrismML Ternary Bonsai: <https://prismml.com/news/ternary-bonsai>, <https://www.prnewswire.com/news-releases/prismml-introduces-ternary-bonsai-model-family-302745151.html>

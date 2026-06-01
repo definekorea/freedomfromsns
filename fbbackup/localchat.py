@@ -1,22 +1,28 @@
-"""Local, no-key AI chat via PrismML **Ternary Bonsai** (1.58-bit) on llama.cpp.
+"""Local, no-key AI chat — a bundled ``llama-server`` running a small GGUF model.
 
-A Tier-2 chat option that needs no API key and runs on low-powered, GPU-less
-devices: download a prebuilt ``llama-server`` (PrismML's llama.cpp fork — it has
-the Q2_0 ternary kernels stock llama.cpp lacks) plus the Bonsai-1.7B Q2_0 GGUF,
-and run a loopback OpenAI-compatible server. The existing chat path
-(``providers.chat_complete`` in OpenAI wire format) talks to it unchanged, so this
-module only handles the binary/model download + the server lifecycle.
+A Tier-2 chat option that needs no API key and runs on modest, GPU-less hardware:
+we download a prebuilt ``llama-server`` (PrismML's llama.cpp fork — it carries the
+Q2_0 ternary kernels stock llama.cpp lacks, and runs ordinary GGUFs too) plus a
+small instruct GGUF, and run a loopback OpenAI-compatible server. The existing chat
+path (``providers.chat_complete`` in OpenAI wire format) talks to it unchanged.
 
-RAG-only (the agentic tool-loop is Gemini-native). Honest tradeoffs: a 1.7B
-ternary model is fast and free but weaker than a frontier API and English-centric
-— Korean answers are rough. It's the "runs offline on a weak machine" path, not a
-Gemini replacement. Binaries: github.com/PrismML-Eng/llama.cpp; model:
-huggingface.co/prism-ml/Ternary-Bonsai-1.7B-gguf.
+Three curated models (measured on this archive's Korean RAG prompts, June 2026):
+  exaone — LG **EXAONE 3.5 2.4B** (Korean-native, bilingual): best Korean answers;
+           the default and the right pick for a Korean archive.
+  qwen3  — **Qwen3 1.7B** (multilingual): correct + lighter; thinking disabled at
+           launch (--reasoning off) so it replies directly.
+  bonsai — PrismML **Ternary Bonsai 1.7B** (1.58-bit): ultralight/offline, but
+           English-centric — Korean answers are rough. Kept for low-end/English use.
+
+RAG-only (the agentic tool-loop is Gemini-native). Honest tradeoff: small local
+models are weaker than a frontier API — for top quality, a free Gemini key wins.
+Binaries: github.com/PrismML-Eng/llama.cpp · models: huggingface.co.
 """
 from __future__ import annotations
 
 import os
 import platform
+import signal
 import subprocess
 import sys
 import tarfile
@@ -26,12 +32,28 @@ import zipfile
 from pathlib import Path
 
 PORT = 8284                       # loopback OpenAI server (distinct from serve 8282)
-PROVIDER = "bonsai"               # the providers.py chat-provider id pointing here
-_REL = "prism-b8846-d104cf1"      # PrismML-Eng/llama.cpp release with the ternary kernels
+PROVIDER = "local"                # the providers.py chat-provider id pointing here
+DEFAULT_MODEL = "exaone"
+_REL = "prism-b8846-d104cf1"      # PrismML-Eng/llama.cpp release (Q2_0 kernels + recent archs)
 _BASE = f"https://github.com/PrismML-Eng/llama.cpp/releases/download/{_REL}"
-_MODEL_FILE = "Ternary-Bonsai-1.7B-Q2_0.gguf"
-_MODEL_URL = f"https://huggingface.co/prism-ml/Ternary-Bonsai-1.7B-gguf/resolve/main/{_MODEL_FILE}"
-_MODEL_MIN_BYTES = 200_000_000    # sanity floor: a complete 1.7B Q2_0 is ~0.6 GB
+_HF = "https://huggingface.co"
+
+# key → model spec. ``flags`` are extra llama-server args; ``min_mb`` is a
+# completed-download sanity floor.
+MODELS: dict[str, dict] = {
+    "exaone": {"label": "EXAONE 3.5 2.4B — Korean-native (recommended)",
+               "file": "EXAONE-3.5-2.4B-Instruct-Q4_K_M.gguf",
+               "url": f"{_HF}/LGAI-EXAONE/EXAONE-3.5-2.4B-Instruct-GGUF/resolve/main/EXAONE-3.5-2.4B-Instruct-Q4_K_M.gguf",
+               "min_mb": 800, "flags": []},
+    "qwen3":  {"label": "Qwen3 1.7B — multilingual",
+               "file": "Qwen3-1.7B-Q8_0.gguf",
+               "url": f"{_HF}/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf",
+               "min_mb": 800, "flags": ["--reasoning", "off"]},   # reply directly, no <think>
+    "bonsai": {"label": "Bonsai 1.7B — ternary, ultralight (English; weak Korean)",
+               "file": "Ternary-Bonsai-1.7B-Q2_0.gguf",
+               "url": f"{_HF}/prism-ml/Ternary-Bonsai-1.7B-gguf/resolve/main/Ternary-Bonsai-1.7B-Q2_0.gguf",
+               "min_mb": 200, "flags": []},
+}
 
 
 def _asset() -> tuple[str, str]:
@@ -45,8 +67,8 @@ def _asset() -> tuple[str, str]:
 
 
 def cache_dir() -> Path:
-    base = (Path(os.environ.get("LOCALAPPDATA", Path.home())) / "ffs" / "bonsai"
-            if os.name == "nt" else Path.home() / ".cache" / "ffs" / "bonsai")
+    base = (Path(os.environ.get("LOCALAPPDATA", Path.home())) / "ffs" / "localchat"
+            if os.name == "nt" else Path.home() / ".cache" / "ffs" / "localchat")
     base.mkdir(parents=True, exist_ok=True)
     return base
 
@@ -81,12 +103,8 @@ def ensure_binary() -> Path | None:
     asset, kind = _asset()
     arc = d / asset
     _download(f"{_BASE}/{asset}", arc, "server")
-    if kind == "zip":
-        with zipfile.ZipFile(arc) as z:
-            z.extractall(d)
-    else:
-        with tarfile.open(arc) as t:
-            t.extractall(d)
+    with (zipfile.ZipFile(arc) if kind == "zip" else tarfile.open(arc)) as a:
+        a.extractall(d)
     arc.unlink(missing_ok=True)
     exe = _server_exe(d)
     if exe and os.name != "nt":
@@ -94,12 +112,21 @@ def ensure_binary() -> Path | None:
     return exe
 
 
-def ensure_model() -> Path:
-    """Download the Bonsai Q2_0 GGUF once; cached thereafter."""
-    m = cache_dir() / _MODEL_FILE
-    if not m.is_file() or m.stat().st_size < _MODEL_MIN_BYTES:
-        _download(_MODEL_URL, m, "model")
+def ensure_model(key: str) -> Path:
+    """Download the chosen model's GGUF once; cached thereafter."""
+    spec = MODELS[key]
+    m = cache_dir() / spec["file"]
+    if not m.is_file() or m.stat().st_size < spec["min_mb"] * 1024 * 1024:
+        _download(spec["url"], m, spec["label"].split(" —")[0])
     return m
+
+
+def active_model() -> str:
+    try:
+        k = (cache_dir() / "active.txt").read_text(encoding="utf-8").strip()
+        return k if k in MODELS else DEFAULT_MODEL
+    except Exception:  # noqa: BLE001
+        return DEFAULT_MODEL
 
 
 def is_up(port: int = PORT) -> bool:
@@ -110,25 +137,48 @@ def is_up(port: int = PORT) -> bool:
         return False
 
 
-def start(port: int = PORT, wait: int = 90) -> bool:
-    """Ensure the binary + model are present and a server is listening. Returns True
-    once /health responds (model load can take a while on a weak CPU)."""
+def stop() -> None:
+    """Stop the running server (by recorded PID). Best-effort, cross-platform."""
+    pf = cache_dir() / "server.pid"
+    try:
+        os.kill(int(pf.read_text()), signal.SIGTERM)
+        for _ in range(10):
+            if not is_up():
+                break
+            time.sleep(0.5)
+    except Exception:  # noqa: BLE001
+        pass
+    finally:
+        pf.unlink(missing_ok=True)
+
+
+def start(key: str | None = None, port: int = PORT, wait: int = 150) -> bool:
+    """Ensure the binary + chosen model are present and a server is serving that
+    model. Switches models if a different one is running. Returns True once /health
+    responds (model load can take a while on a weak CPU)."""
+    key = key or active_model()
+    if key not in MODELS:
+        key = DEFAULT_MODEL
     if is_up(port):
-        return True
+        if active_model() == key:
+            return True
+        stop()                                   # switching models → restart
     exe = ensure_binary()
     if not exe:
         return False
-    model = ensure_model()
+    model = ensure_model(key)
     threads = max(1, (os.cpu_count() or 2) - 1)
     args = [str(exe), "-m", str(model), "--host", "127.0.0.1", "--port", str(port),
-            "-c", "4096", "-t", str(threads)]
+            "-c", "4096", "-t", str(threads), *MODELS[key]["flags"]]
     log = open(cache_dir() / "server.log", "ab")
     kw: dict = {}
     if os.name == "nt":
         kw["creationflags"] = 0x00000008 | 0x00000200   # DETACHED_PROCESS | NEW_PROCESS_GROUP
     else:
         kw["start_new_session"] = True
-    subprocess.Popen(args, stdout=log, stderr=log, stdin=subprocess.DEVNULL, **kw)
+    p = subprocess.Popen(args, stdout=log, stderr=log, stdin=subprocess.DEVNULL, **kw)
+    (cache_dir() / "server.pid").write_text(str(p.pid), encoding="utf-8")
+    (cache_dir() / "active.txt").write_text(key, encoding="utf-8")
     for _ in range(wait):
         if is_up(port):
             return True

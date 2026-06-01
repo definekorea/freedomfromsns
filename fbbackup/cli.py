@@ -748,8 +748,10 @@ def _build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("uninstall", help="remove launchers/auto-start/caches (keeps your data)")
 
-    lc = sub.add_parser("localchat", help="download + run a no-key local AI chat model (PrismML Bonsai 1.7B)")
-    lc.add_argument("--stop", action="store_true", help="how to stop the local model server")
+    lc = sub.add_parser("localchat", help="download + run a no-key local AI chat model (EXAONE/Qwen3/Bonsai)")
+    lc.add_argument("--model", choices=["exaone", "qwen3", "bonsai"], help="which model (default: exaone)")
+    lc.add_argument("--list", action="store_true", help="list available local models")
+    lc.add_argument("--stop", action="store_true", help="stop the local model server")
 
     sh = sub.add_parser("share", help="Cloudflare quick tunnel to a running server")
     sh.add_argument("--port", default="9119", help="local port to expose (default 9119)")
@@ -783,29 +785,40 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def cmd_localchat(args) -> int:
-    """Download + run PrismML Ternary Bonsai (1.7B) as a no-key local chat model,
-    set it as the chat provider, and test it. Offline + no GPU; weak on Korean —
-    for quality, prefer a Gemini key. RAG-only (the agentic loop is Gemini-native)."""
+    """Download + run a small no-key local chat model, set it as the chat provider,
+    and test it. Offline + no GPU; RAG-only (the agentic loop is Gemini-native).
+    Default EXAONE 3.5 2.4B is best for Korean; for top quality, prefer a Gemini key."""
     from fbbackup import localchat, providers
     home = _home()
     os.environ["FBBACKUP_HOME"] = str(home)
-    if getattr(args, "stop", False):
-        print("The local model server runs detached. Stop it via Task Manager (Windows) "
-              "or `pkill -f llama-server` (mac/Linux).")
+    if getattr(args, "list", False):
+        print("Local chat models (ffs localchat --model <key>):")
+        for k, m in localchat.MODELS.items():
+            star = "  (default)" if k == localchat.DEFAULT_MODEL else ""
+            print(f"  {k:8} {m['label']}{star}")
         return 0
-    print("Setting up no-key local AI chat — PrismML Ternary Bonsai 1.7B.", flush=True)
-    print("It's small + English-centric, so Korean answers are rough; for best quality "
-          "connect a free Gemini key instead. First run downloads ~0.6 GB.", flush=True)
-    if not localchat.start():
-        print(f"✗ Couldn't download/start the local model. See {localchat.cache_dir() / 'server.log'}.",
+    if getattr(args, "stop", False):
+        localchat.stop()
+        print("Stopped the local model server.")
+        return 0
+    key = getattr(args, "model", None) or localchat.DEFAULT_MODEL
+    if key not in localchat.MODELS:
+        print(f"Unknown model '{key}'. Choices: {', '.join(localchat.MODELS)}", file=sys.stderr)
+        return 2
+    print(f"Setting up no-key local AI chat — {localchat.MODELS[key]['label']}.", flush=True)
+    print("Offline + no GPU; small models are weaker than a frontier API — for top "
+          "quality connect a free Gemini key. First run downloads the model (~1–2 GB).", flush=True)
+    if not localchat.start(key):
+        print(f"✗ Couldn't download/start the model. See {localchat.cache_dir() / 'server.log'}.",
               file=sys.stderr)
         return 1
     providers.save_settings({"chat": {"provider": localchat.PROVIDER,
-                                      "fast_model": "bonsai", "precise_model": "bonsai"}})
-    print(f"✓ Running at http://127.0.0.1:{localchat.PORT} and set as your chat provider.", flush=True)
-    ok, detail = providers.test_chat(localchat.PROVIDER, "bonsai")
+                                      "fast_model": "local", "precise_model": "local"}})
+    print(f"✓ {key} running at http://127.0.0.1:{localchat.PORT}, set as your chat provider.", flush=True)
+    ok, detail = providers.test_chat(localchat.PROVIDER, "local")
     print(f"  test: {'OK — ' if ok else 'FAILED — '}{detail}", flush=True)
-    print("Open the app and try AI chat — it'll use the local model. Re-run `ffs localchat` anytime.", flush=True)
+    print("Open the app and try AI chat — it'll use the local model. "
+          "Switch anytime: `ffs localchat --model exaone|qwen3|bonsai`.", flush=True)
     return 0
 
 

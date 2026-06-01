@@ -50,12 +50,12 @@ CHAT_PROVIDERS: dict[str, dict] = {
     "ollama": {"label": "Ollama (local · offline)", "format": "openai", "key_env": "",
                "base_url": "http://localhost:11434/v1", "fast": "llama3.2", "precise": "llama3.1",
                "signup": "https://ollama.com"},
-    # Bundled no-key local chat: PrismML Ternary Bonsai 1.7B on a loopback
-    # llama-server we download + manage (see localchat.py). RAG-only; weak on
-    # Korean — an offline/low-power option, not a frontier replacement.
-    "bonsai": {"label": "Local · Bonsai 1.7B (offline, no key, no GPU)", "format": "openai", "key_env": "",
-               "base_url": "http://127.0.0.1:8284/v1", "fast": "bonsai", "precise": "bonsai",
-               "signup": "https://prismml.com/news/ternary-bonsai"},
+    # Bundled no-key local chat: a small GGUF on a loopback llama-server we download
+    # + manage (see localchat.py — EXAONE / Qwen3 / Bonsai). RAG-only; weaker than a
+    # frontier API, but offline and free.
+    "local": {"label": "Local model (offline, no key, no GPU) — `ffs localchat`", "format": "openai",
+              "key_env": "", "base_url": "http://127.0.0.1:8284/v1", "fast": "local", "precise": "local",
+              "signup": ""},
 }
 
 # Embedding providers are implemented in embed.py; cataloged here for the UI.
