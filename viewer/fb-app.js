@@ -16,6 +16,7 @@
       search_ph: "검색…", all: "전체", year_all: "모든 연도", load_fail: "콘텐츠를 불러오지 못했습니다.",
       type_photo: "사진", type_video: "영상", type_link: "링크", type_status: "글", type_share: "공유", type_uncat: "미분류", type_trash: "휴지통",
       sel_start: "선택", sel_done: "완료", sel_all: "전체 선택", sel_none: "선택 해제", sel_count: "개 선택됨", sel_erase: "삭제", sel_restore: "복원",
+      show_hidden: "숨김 보기", show_hidden_hint: "삭제(숨김) 처리한 글을 함께 보여줍니다 — 데이터는 지워지지 않고 태그만 붙습니다",
       mon: "일월화수목금토", months: "1월 2월 3월 4월 5월 6월 7월 8월 9월 10월 11월 12월",
       related_searching: "  ·  관련 글 찾는 중…", semantic: "  ·  의미 검색",
       searching: "검색 중…", no_results: "결과가 없습니다.", no_results2: "결과 없음",
@@ -40,6 +41,7 @@
       search_ph: "Search…", all: "All", year_all: "All years", load_fail: "Couldn't load content.",
       type_photo: "Photos", type_video: "Videos", type_link: "Links", type_status: "Text", type_share: "Shares", type_uncat: "Unsorted", type_trash: "Trash",
       sel_start: "Select", sel_done: "Done", sel_all: "Select all", sel_none: "Clear", sel_count: " selected", sel_erase: "Erase", sel_restore: "Restore",
+      show_hidden: "Show hidden", show_hidden_hint: "Also show erased (hidden) posts — nothing is deleted, just tagged",
       mon: "SMTWTFS", months: "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec",
       related_searching: "  ·  finding related…", semantic: "  ·  semantic",
       searching: "Searching…", no_results: "No results.", no_results2: "No results",
@@ -80,6 +82,7 @@
     semanticLoading: false, searchToken: 0,
     ctx: null,                  // ordered post ids for detail prev/next (current context)
     selMode: false, sel: {}, selAnchor: null,   // multi-select: mode, {id:true}, range anchor
+    showErased: (function () { try { return localStorage.getItem("ffs.showErased") === "1"; } catch (e) { return false; } })(),
     scroll: (function () { try { return JSON.parse(localStorage.getItem("ffs.scroll") || "{}") || {}; } catch (e) { return {}; } })(),
     _rendered: null,            // last view actually rendered (for enter-restore)
     lang: (function () { try { return localStorage.getItem("ffs.lang") || (/^en/i.test(navigator.language || "") ? "en" : "ko"); } catch (e) { return "ko"; } })(),
@@ -91,6 +94,11 @@
   /* ── boot ───────────────────────────────────────────────────────────── */
   function el(t, c, txt) { var e = document.createElement(t); if (c) e.className = c; if (txt != null) e.textContent = txt; return e; }
   function fmtDate(d) { return d ? d.slice(0, 10) : ""; }
+  // Brand wordmark: FreedomFromSNS with the F · F · S (Freedom · From · SNS)
+  // picked out as accents — the "FFS" reads out of the full name.
+  function brandWordmark() {
+    return '<span class="fa">F</span>reedom<span class="fa">F</span>rom<span class="fa">S</span>NS';
+  }
 
   fetch(CFG.index).then(function (r) { return r.json(); }).then(function (data) {
     S.posts = (data || []).filter(function (p) { return p.date; });
@@ -113,7 +121,7 @@
   function buildChrome() {
     var top = el("div", "fb-top");
     var bar = el("div", "fb-bar");
-    var brand = el("div", "fb-brand"); brand.innerHTML = (CFG.site || "Unattached") + ' <small>' + tr("archive") + '</small>';
+    var brand = el("div", "fb-brand"); brand.innerHTML = brandWordmark();
     brand.style.cursor = "pointer"; brand.onclick = goHome;
 
     var tabs = el("div", "fb-tabs");
@@ -163,9 +171,15 @@
       }
       ["all", "photo", "video", "status"].forEach(function (t) { els.filters.appendChild(chip(t, false)); });
       els.filters.appendChild(el("div", "fb-chip-div"));
-      ["link", "share", "uncat", "trash"].forEach(function (t) { els.filters.appendChild(chip(t, true)); });
+      ["link", "share", "uncat"].forEach(function (t) { els.filters.appendChild(chip(t, true)); });
     }
     els.filters.appendChild(el("div", "fb-sp"));
+    if (S.view === "browse") {           // reveal erased ("hidden") items inline, tagged
+      var hb = el("button", "fb-selbtn" + (S.showErased ? " on" : ""), "👁 " + tr("show_hidden"));
+      hb.title = tr("show_hidden_hint");
+      hb.onclick = function () { S.showErased = !S.showErased; try { localStorage.setItem("ffs.showErased", S.showErased ? "1" : "0"); } catch (e) {} S.shown = PAGE; renderCurrentView(); };
+      els.filters.appendChild(hb);
+    }
     if (S.view === "browse") {           // year dropdown only on browse (calendar has its sidebar)
       var sel = el("select", "fb-year");
       sel.appendChild(new Option(tr("year_all"), "all"));
@@ -194,8 +208,6 @@
     if (els.tabCal) els.tabCal.textContent = tr("calendar");
     if (els.tabChat) els.tabChat.textContent = tr("aichat");
     if (els.q) els.q.placeholder = tr("search_ph");
-    var small = document.querySelector(".fb-brand small");
-    if (small) small.textContent = tr("archive");
     renderCurrentView();
   }
 
@@ -338,10 +350,9 @@
     var q = S.q.toLowerCase();
     return S.posts.filter(function (p) { return !q || (p.title + " " + (p.excerpt || "")).toLowerCase().indexOf(q) >= 0; });
   }
-  var BUCKETS = { link: 1, share: 1, uncat: 1, trash: 1 };  // click-into; hidden from 전체
+  var BUCKETS = { link: 1, share: 1, uncat: 1 };  // click-into; hidden from 전체
   function passType(p) {
-    if (S.type === "trash") return !!p.erased;                  // trash shows ONLY erased
-    if (p.erased) return false;                                 // erased hidden from every other view
+    if (p.erased && !S.showErased) return false;               // erased = a hidden tag; reveal with the toggle
     if (S.type === "all") return !BUCKETS[p.type] && !p.empty;  // default feed: real content only
     if (BUCKETS[S.type]) return p.type === S.type;              // a bucket shows its whole type
     return p.type === S.type && !p.empty;                       // 사진/영상/글: hide empties too
@@ -391,19 +402,19 @@
     var none = el("button", "fb-selbar-btn", tr("sel_none")); none.onclick = deselectAll;
     els.selPublic = el("button", "fb-selbar-btn", "🌐 " + tr("public")); els.selPublic.onclick = function () { bulkPrivacy("public"); };
     els.selPrivate = el("button", "fb-selbar-btn", "🔒 " + tr("private")); els.selPrivate.onclick = function () { bulkPrivacy("private"); };
-    els.selErase = el("button", "fb-selbar-btn danger"); els.selErase.onclick = bulkEraseOrRestore;
+    els.selErase = el("button", "fb-selbar-btn danger", "🗑 " + tr("sel_erase")); els.selErase.onclick = function () { bulkErase(true); };
+    els.selRestore = el("button", "fb-selbar-btn", "♻ " + tr("sel_restore")); els.selRestore.onclick = function () { bulkErase(false); };
     var done = el("button", "fb-selbar-btn done", tr("sel_done")); done.onclick = toggleSelMode;
-    [els.selCount, all, none, els.selPublic, els.selPrivate, els.selErase, done].forEach(function (x) { els.selBar.appendChild(x); });
+    [els.selCount, all, none, els.selPublic, els.selPrivate, els.selErase, els.selRestore, done].forEach(function (x) { els.selBar.appendChild(x); });
     document.body.appendChild(els.selBar);
   }
   function updateSelBar() {
     if (!els.selBar) buildSelBar();
-    var n = selCount(), trash = S.type === "trash";
+    var n = selCount();
     els.selBar.classList.toggle("on", S.selMode && S.view === "browse");
     els.selCount.textContent = n + tr("sel_count");
-    els.selErase.textContent = trash ? ("♻ " + tr("sel_restore")) : ("🗑 " + tr("sel_erase"));
-    els.selPublic.style.display = els.selPrivate.style.display = trash ? "none" : "";
-    [els.selPublic, els.selPrivate, els.selErase].forEach(function (b) { b.disabled = n === 0; });
+    els.selRestore.style.display = S.showErased ? "" : "none";   // restore only when erased items are visible
+    [els.selPublic, els.selPrivate, els.selErase, els.selRestore].forEach(function (b) { b.disabled = n === 0; });
   }
   function bulkPrivacy(privacy) {
     var fbids = selectedFbids(); if (!fbids.length) return;
@@ -414,14 +425,13 @@
         renderCurrentView();
       }).catch(function () {});
   }
-  function bulkEraseOrRestore() {
+  function bulkErase(erased) {
     var fbids = selectedFbids(); if (!fbids.length) return;
-    var restore = S.type === "trash";
-    fetch("/api/erase", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fbids: fbids, erased: !restore }) })
+    fetch("/api/erase", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fbids: fbids, erased: erased }) })
       .then(function (r) { return r.json(); }).then(function () {
-        Object.keys(S.sel).forEach(function (id) { if (S.byId[id]) S.byId[id].erased = !restore; });
+        Object.keys(S.sel).forEach(function (id) { if (S.byId[id]) S.byId[id].erased = erased; });
         S.sel = {}; S.selAnchor = null;
-        renderCurrentView();   // erased posts leave the view; restored ones leave the trash
+        renderCurrentView();   // erased items vanish (unless "show hidden"); restored ones lose the tag
       }).catch(function () {});
   }
 
@@ -679,9 +689,13 @@
       var nav = el("div", "fb-doc-nav");
       var pv = el("button", "fb-doc-navbtn", "‹"); pv.title = tr("prev"); pv.onclick = function () { docNav(-1); };
       var nx = el("button", "fb-doc-navbtn", "›"); nx.title = tr("next"); nx.onclick = function () { docNav(1); };
-      nav.appendChild(pv);
-      nav.appendChild(el("div", "fb-doc-pos", (ctxPos + 1) + " / " + S.ctx.length));
-      nav.appendChild(nx);
+      var posEl = el("div", "fb-doc-pos", (ctxPos + 1) + " / " + S.ctx.length);
+      // scrubber — drag to skip hundreds/thousands; release to jump there.
+      var sld = el("input"); sld.type = "range"; sld.className = "fb-doc-slider";
+      sld.min = 0; sld.max = S.ctx.length - 1; sld.value = ctxPos; sld.title = tr("lb_goto");
+      sld.addEventListener("input", function () { posEl.textContent = (+sld.value + 1) + " / " + S.ctx.length; });
+      sld.addEventListener("change", function () { openPost(S.ctx[+sld.value], S.ctx); });
+      nav.appendChild(pv); nav.appendChild(sld); nav.appendChild(nx); nav.appendChild(posEl);
       bar.appendChild(nav);
     }
     // privacy toggle — private gates sharing/export only (still shown locally)
@@ -697,6 +711,18 @@
           .catch(function () {});
       };
       bar.appendChild(pvb);
+      // erase ("hide") toggle — a soft delete; reveal hidden items with 👁 숨김 보기
+      var eb = el("button", "fb-doc-priv");
+      var setE = function () { eb.textContent = p.erased ? ("♻ " + tr("sel_restore")) : ("🗑 " + tr("sel_erase")); eb.className = "fb-doc-priv" + (p.erased ? " erased" : ""); };
+      setE(); eb.title = tr("show_hidden_hint");
+      eb.onclick = function () {
+        var next = !p.erased;
+        fetch("/api/erase", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fbid: p.fbid, erased: next }) })
+          .then(function (r) { return r.json(); })
+          .then(function () { p.erased = next; setE(); })
+          .catch(function () {});
+      };
+      bar.appendChild(eb);
     }
     doc.appendChild(bar);
     var body = el("div", "fb-doc-body");

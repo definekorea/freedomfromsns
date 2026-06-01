@@ -38,8 +38,8 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
 /* ── Header / nav ─────────────────────────────────────────────────────── */
 .fb-top { position: sticky; top: 0; z-index: 40; background: rgba(10,10,10,.82); backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
 .fb-bar { max-width: var(--max); margin: 0 auto; display: flex; align-items: center; gap: 1rem; padding: .7rem 1.1rem; }
-.fb-brand { font-family: "Bebas Neue", "Pretendard Variable", Impact, sans-serif; font-size: 1.6rem; letter-spacing: 1.5px; color: var(--gold); white-space: nowrap; }
-.fb-brand small { color: var(--faint); font-size: .8rem; letter-spacing: 1px; margin-left: .3rem; }
+.fb-brand { font-family: "Bebas Neue", "Pretendard Variable", Impact, sans-serif; font-size: 1.7rem; letter-spacing: 1.5px; color: #dcd8cc; white-space: nowrap; line-height: 1; }
+.fb-brand .fa { color: var(--gold); font-size: 1.32em; font-weight: 700; text-shadow: 0 0 18px rgba(224,192,96,.35); margin: 0 -.02em; }
 .fb-tabs { display: flex; gap: .25rem; }
 .fb-tab { padding: .4rem .85rem; border-radius: 999px; color: var(--dim); font-size: .92rem; font-weight: 500; transition: .15s; }
 .fb-tab:hover { color: #fff; background: var(--bg3); }
@@ -132,19 +132,23 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
 .fb-modal { position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,.78); backdrop-filter: blur(4px); display: none; padding: 3vh 1rem; overflow-y: auto; }
 .fb-modal.on { display: block; }
 .fb-doc { max-width: 800px; margin: 0 auto; background: #0e0e0e; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; box-shadow: 0 24px 80px rgba(0,0,0,.7); }
-.fb-doc-bar { position: sticky; top: 0; display: flex; align-items: center; gap: .8rem; padding: .7rem 1rem; background: rgba(14,14,14,.92); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); z-index: 2; }
+.fb-doc-bar { position: sticky; top: 0; display: flex; align-items: center; gap: .8rem; padding: .7rem 1rem; background: rgba(14,14,14,.92); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); z-index: 2; flex-wrap: wrap; }
 .fb-doc-bar .fb-date { flex: 1; }
 .fb-x { font-size: 1.4rem; line-height: 1; color: var(--dim); width: 2rem; height: 2rem; border-radius: 5px; }
 .fb-x:hover { background: var(--bg3); color: #fff; }
 .fb-orig { font-size: .82rem; color: var(--gold); padding: .3rem .7rem; border: 1px solid rgba(224,192,96,.35); border-radius: 5px; }
 .fb-orig:hover { background: rgba(224,192,96,.1); }
-.fb-doc-nav { display: flex; align-items: center; gap: .25rem; }
+.fb-doc-nav { display: flex; align-items: center; gap: .4rem; }
+.fb-doc-slider { -webkit-appearance: none; appearance: none; width: 130px; height: 4px; border-radius: 3px; background: var(--line); cursor: pointer; }
+.fb-doc-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--gold); cursor: pointer; border: 2px solid #0e0e0e; }
+.fb-doc-slider::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--gold); cursor: pointer; border: 2px solid #0e0e0e; }
 .fb-doc-navbtn { width: 30px; height: 30px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg3); color: var(--dim); font-size: 1.2rem; line-height: 1; cursor: pointer; }
 .fb-doc-navbtn:hover { color: var(--fg); border-color: var(--accent); }
 .fb-doc-pos { font-size: .78rem; color: var(--faint); min-width: 48px; text-align: center; font-variant-numeric: tabular-nums; }
 .fb-doc-priv { font-size: .8rem; color: var(--dim); background: var(--bg3); border: 1px solid var(--line); border-radius: 5px; padding: .3rem .6rem; cursor: pointer; white-space: nowrap; }
 .fb-doc-priv:hover { color: var(--fg); border-color: var(--accent); }
 .fb-doc-priv.on { color: #e6a23c; border-color: rgba(230,162,60,.4); background: rgba(230,162,60,.08); }
+.fb-doc-priv.erased { color: var(--red); border-color: rgba(190,60,60,.45); background: rgba(190,60,60,.1); }
 .fb-lock { position: absolute; top: 6px; left: 6px; z-index: 3; font-size: .8rem; line-height: 1; padding: 2px 4px; border-radius: 4px; background: rgba(0,0,0,.55); pointer-events: none; }
 .fb-erased-tag { position: absolute; top: 6px; left: 34px; z-index: 3; font-size: .8rem; line-height: 1; padding: 2px 4px; border-radius: 4px; background: rgba(190,60,60,.7); pointer-events: none; }
 
