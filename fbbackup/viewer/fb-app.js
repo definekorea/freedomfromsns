@@ -55,7 +55,8 @@
       pub_create: "공개 링크 만들기", pub_creating: "링크 만드는 중… (몇 초 걸려요)",
       pub_live: "이제 이 주소로 누구나 볼 수 있어요:", pub_stop: "공개 중지", pub_stopped: "공개를 중지했습니다.",
       pub_copy: "복사", pub_copied: "복사됨 ✓",
-      pub_need_cf: "공개하려면 cloudflared가 필요합니다. 설치 안내:",
+      pub_need_cf: "cloudflared를 자동으로 받지 못했습니다. 직접 설치:",
+      pub_cf_note: "처음 한 번 cloudflared(약 35MB)를 자동으로 내려받습니다.",
       pub_note: "이 컴퓨터와 앱이 켜져 있는 동안만 작동하는 임시 주소이며, 재시작하면 바뀝니다. 내 도메인의 고정 주소를 원하면 터미널에서 `ffs tunnel` 실행(무료 Cloudflare 계정 + 도메인 필요).",
       embed_pill_building: "스마트 검색 만드는 중… {pct}%", embed_pill_ready: "✓ 스마트 검색 준비 완료",
     },
@@ -98,7 +99,8 @@
       pub_create: "Create a public link", pub_creating: "Creating your link… (a few seconds)",
       pub_live: "Anyone with this link can now view your archive:", pub_stop: "Stop sharing", pub_stopped: "Sharing stopped.",
       pub_copy: "Copy", pub_copied: "Copied ✓",
-      pub_need_cf: "Publishing needs cloudflared. Install it:",
+      pub_need_cf: "Couldn't download cloudflared automatically. Install it:",
+      pub_cf_note: "First time, this downloads cloudflared (~35 MB) automatically.",
       pub_note: "A temporary link that works only while this computer and app are running, and changes on restart. For a stable address on your own domain, run `ffs tunnel` in a terminal (needs a free Cloudflare account + a domain).",
       embed_pill_building: "Building smart search… {pct}%", embed_pill_ready: "✓ Smart search ready",
     },
@@ -359,13 +361,13 @@
   function renderPublishBody() {
     pubStatus().then(function (s) {
       if (!els.pub) return;
-      if (!s.installed) return pubShowNeedCf();
       if (s.running && s.url) return pubShowLive(s.url);
       if (s.running) { pubShowCreating(); return pubPollUrl(); }
       els.pubBody.innerHTML = "";
       var btn = el("button", "fb-pub-btn primary", tr("pub_create"));
       btn.onclick = pubStart;
       els.pubBody.appendChild(btn);
+      if (!s.installed) els.pubBody.appendChild(el("div", "fb-pub-need", tr("pub_cf_note")));  // first-run downloads cloudflared
     }).catch(function () {});
   }
   function pubShowNeedCf() {

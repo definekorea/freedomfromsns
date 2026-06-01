@@ -348,6 +348,8 @@ def cmd_tunnel(args) -> int:
         print(wiz.t(lang, key, **kw), flush=True)
 
     if not tn.cloudflared():
+        say("tn_downloading_cf")                       # fetch the official binary on demand
+    if not tn.ensure_cloudflared():
         say("tn_need_cf")
         print("  https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/")
         return 2

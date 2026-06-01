@@ -64,7 +64,8 @@ STRINGS: dict[str, dict[str, str]] = {
                         "Browsing + keyword search work now; for fast meaning-based search, "
                         "connect a free AI key in the app (skipped the local model for now).",
         "embed_skip": "Skipped. You can enable smart search & chat anytime in the app.",
-        "tn_need_cf": "A permanent address needs cloudflared. Install it:",
+        "tn_downloading_cf": "Downloading cloudflared (one time, ~35 MB)…",
+        "tn_need_cf": "Couldn't get cloudflared automatically. Install it:",
         "tn_intro":  "A permanent address lives on your own domain (e.g. archive.yourname.com) and "
                      "survives restarts. You need a FREE Cloudflare account and a domain whose DNS "
                      "is on Cloudflare. (Don't have one? Register a cheap domain and add it to "
@@ -129,7 +130,8 @@ STRINGS: dict[str, dict[str, str]] = {
                         "둘러보기·키워드 검색은 지금 바로 되고, 빠른 의미 검색을 원하면 "
                         "앱에서 무료 AI 키를 연결하세요(로컬 모델은 일단 건너뜀).",
         "embed_skip": "건너뛰었습니다. 스마트 검색·AI 대화는 언제든 앱에서 켤 수 있어요.",
-        "tn_need_cf": "고정 주소를 만들려면 cloudflared가 필요합니다. 설치:",
+        "tn_downloading_cf": "cloudflared를 내려받는 중입니다(최초 1회, 약 35 MB)…",
+        "tn_need_cf": "cloudflared를 자동으로 받지 못했습니다. 직접 설치:",
         "tn_intro":  "고정 주소는 내 도메인(예: archive.yourname.com)으로 제공되며 재시작해도 "
                      "유지됩니다. **무료 Cloudflare 계정**과 **DNS가 Cloudflare에 등록된 도메인**이 "
                      "필요합니다. (없다면 저렴한 도메인을 사서 Cloudflare 무료 플랜에 추가하세요 — "

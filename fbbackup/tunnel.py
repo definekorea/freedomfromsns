@@ -14,13 +14,78 @@ with ``--config`` that file, so it never reads or clobbers an existing
 from __future__ import annotations
 
 import json
+import os
+import platform
+import stat
 import subprocess
+import tarfile
+import urllib.request
 from pathlib import Path
 from shutil import which
 
 
+def _cf_cache_dir() -> Path:
+    """Stable per-user dir for an auto-downloaded cloudflared (not on PATH)."""
+    base = os.environ.get("LOCALAPPDATA") if os.name == "nt" else None
+    root = Path(base) if base else (Path.home() / ".cache")
+    d = root / "ffs" / "bin"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _cf_local() -> Path:
+    return _cf_cache_dir() / ("cloudflared.exe" if os.name == "nt" else "cloudflared")
+
+
 def cloudflared() -> str | None:
-    return which("cloudflared")
+    """A usable cloudflared: system PATH first, else our auto-downloaded copy."""
+    p = which("cloudflared")
+    if p:
+        return p
+    local = _cf_local()
+    return str(local) if local.exists() else None
+
+
+def _cf_asset() -> str | None:
+    """The official release asset name for this OS/arch (cloudflare/cloudflared)."""
+    m = platform.machine().lower()
+    arch = ("amd64" if m in ("x86_64", "amd64") else
+            "arm64" if m in ("arm64", "aarch64") else
+            "386" if m in ("i386", "i686", "x86") else None)
+    if os.name == "nt":
+        return f"cloudflared-windows-{arch or 'amd64'}.exe"
+    if platform.system().lower() == "darwin":
+        return f"cloudflared-darwin-{arch or 'amd64'}.tgz"   # macOS ships a .tgz
+    return f"cloudflared-linux-{arch or 'amd64'}"
+
+
+def ensure_cloudflared() -> str | None:
+    """Return a cloudflared path, downloading the official binary on demand if it
+    isn't on PATH or already cached. ~35 MB, one time. Returns None on failure."""
+    p = cloudflared()
+    if p:
+        return p
+    asset = _cf_asset()
+    if not asset:
+        return None
+    url = f"https://github.com/cloudflare/cloudflared/releases/latest/download/{asset}"
+    dest = _cf_local()
+    try:
+        if asset.endswith(".tgz"):
+            tmp = dest.with_name(dest.name + ".tgz")
+            urllib.request.urlretrieve(url, tmp)
+            with tarfile.open(tmp) as tf:
+                member = next(m for m in tf.getmembers() if m.name.rstrip("/").endswith("cloudflared"))
+                with tf.extractfile(member) as src, open(dest, "wb") as out:
+                    out.write(src.read())
+            tmp.unlink(missing_ok=True)
+        else:
+            urllib.request.urlretrieve(url, dest)
+        if os.name != "nt":
+            dest.chmod(dest.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+        return str(dest) if dest.exists() else None
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def cf_dir() -> Path:

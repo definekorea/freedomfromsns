@@ -41,8 +41,8 @@ _TUNNEL: dict = {"proc": None, "url": ""}
 
 
 def _cloudflared() -> str | None:
-    from shutil import which
-    return which("cloudflared")
+    from . import tunnel
+    return tunnel.cloudflared()           # PATH or our auto-downloaded copy
 
 
 def _tunnel_status() -> dict:
@@ -58,7 +58,8 @@ def _start_tunnel(port: int) -> dict:
     import threading
     if _TUNNEL["proc"] and _TUNNEL["proc"].poll() is None:
         return _tunnel_status()                       # already running
-    exe = _cloudflared()
+    from . import tunnel
+    exe = tunnel.ensure_cloudflared()                 # download the binary on demand if missing
     if not exe:
         return _tunnel_status()
     _TUNNEL["url"] = ""

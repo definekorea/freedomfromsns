@@ -332,7 +332,9 @@ Reordered around the §0.1 ladder: **ship Tier 0 the fastest, make AI an unlock.
 8. ✅ **Publish button** in the UI (🌐) — warns to privatise sensitive posts and
    that reshares are mostly missing, then starts a **Cloudflare quick tunnel**
    (`/api/publish/start|stop|status`, loopback-only, isolated config home) and
-   shows the temporary URL with copy + stop. (M) — done. *(First-run tour still TODO.)*
+   shows the temporary URL with copy + stop. **cloudflared is auto-downloaded** on
+   demand (official binary per OS/arch → `~/.cache/ffs/bin`) so a clean machine needs
+   nothing pre-installed; `ffs tunnel` uses the same. (M) — done. *(First-run tour still TODO.)*
 9. ✅ **Named-tunnel helper** — `ffs tunnel <hostname>`: guided, bilingual. Automates
    the scriptable Level-2 steps (`tunnel create` → `route dns` → write a **dedicated**
    `~/ffs/cloudflared.yml` → run) and guides the parts that can't be scripted (the
