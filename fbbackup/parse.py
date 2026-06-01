@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 from datetime import datetime
 from pathlib import Path
@@ -269,6 +270,8 @@ def normalize_post(post: dict, subfolders, by_name, share_links: dict | None = N
         "links": links,
         "media": media,
         "fb_url": fb_url,
+        "albums": [],
+        "source": "facebook-export",
     }
 
 
@@ -301,6 +304,18 @@ def parse(export_root: Path, out_dir: Path) -> dict:
         with open(pf, encoding="utf-8") as fh:
             for raw in json.load(fh):
                 records.append(normalize_post(raw, subfolders, by_name, share_links, fbid_ts, fbid_tx))
+
+    # Ingest media that lives outside posts (albums, uncategorized photos, videos)
+    # as synthetic posts, deduped against media already referenced by a post; then
+    # tag every record whose media belongs to a named album.
+    from .media_extra import album_map, apply_albums, extra_media_posts
+    seen = {os.path.basename(m["uri"]) for r in records for m in r["media"] if m["uri"]}
+    amap: dict[str, str] = {}
+    for posts_dir in {pf.parent for pf in posts_files}:
+        records.extend(extra_media_posts(posts_dir, seen, lambda u: _resolve(u, subfolders, by_name)))
+        amap.update(album_map(posts_dir))
+    tagged = apply_albums(records, amap)
+    print(f"  + {len(seen)} media files; {tagged} posts tagged with an album", flush=True)
 
     records.sort(key=lambda r: r["timestamp"], reverse=True)
 

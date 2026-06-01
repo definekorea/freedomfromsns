@@ -213,6 +213,72 @@ def cmd_status(args) -> int:
     return 0
 
 
+def cmd_doctor(args) -> int:
+    """Plain-language health check — what's working, what needs fixing, and the
+    exact command to fix it. (Borrowed from Weft's `doctor` pattern; serves the
+    'a non-technical person can get unstuck' goal.)"""
+    import urllib.error
+    import urllib.request
+
+    p = _paths(args)
+    state = {"ok": True}
+
+    def line(status: str, label: str, msg: str) -> None:
+        if status == "fail":
+            state["ok"] = False
+        icon = {"ok": "✓", "warn": "⚠", "fail": "✗"}[status]
+        print(f"  {icon} {label:14} {msg}")
+
+    print("FreedomFromSNS — doctor\n")
+    line("ok" if p["export"].is_dir() else "fail", "export",
+         str(p["export"]) if p["export"].is_dir()
+         else "not found  → unzip your Facebook (JSON) export and set [export].root in config.toml")
+
+    from fbbackup.embed import gemini_key
+    key = gemini_key()
+    if not key:
+        line("fail", "Gemini key", "missing  → put GEMINI_PAID_API_KEY=… in .env")
+    else:
+        try:
+            body = json.dumps({"content": {"parts": [{"text": "ok"}]}, "taskType": "RETRIEVAL_QUERY"}).encode()
+            req = urllib.request.Request(
+                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key={key}",
+                data=body, headers={"Content-Type": "application/json"})
+            urllib.request.urlopen(req, timeout=15).read()
+            line("ok", "Gemini key", f"valid (…{key[-4:]})")
+        except urllib.error.HTTPError as e:
+            line("fail", "Gemini key", f"rejected (HTTP {e.code})  → check the key and that billing is on")
+        except Exception as e:  # noqa: BLE001
+            line("warn", "Gemini key", f"could not verify — offline? ({str(e)[:40]})")
+
+    posts = p["index"] / "posts.jsonl"
+    n = sum(1 for _ in posts.open(encoding="utf-8")) if posts.is_file() else 0
+    line("ok" if n else "fail", "index", f"{n} posts" if n else "missing  → run `ffs parse`")
+    nr = sum(1 for _ in p["spaces"].rglob("*.md")) if p["spaces"].is_dir() else 0
+    line("ok" if nr else "fail", "rows", f"{nr} rows" if nr else "missing  → run `ffs build`")
+
+    meta = p["index"] / "embed-meta.json"
+    if (p["index"] / "embeddings.npy").is_file():
+        try:
+            m = json.loads(meta.read_text(encoding="utf-8"))
+            line("ok", "embeddings", f"{m.get('count', '?')} × {m.get('dim', '?')}d ({m.get('provider', '?')})")
+        except Exception:  # noqa: BLE001
+            line("ok", "embeddings", "present")
+    else:
+        line("warn", "embeddings", "missing  → run `ffs embed` (semantic search + chat need it)")
+
+    port = int((p["cfg"].get("serve", {}) or {}).get("port", 8282))
+    try:
+        urllib.request.urlopen(f"http://127.0.0.1:{port}/api/meta", timeout=3).read()
+        line("ok", "server", f"running on :{port}")
+    except Exception:  # noqa: BLE001
+        line("warn", "server", f"not running on :{port}  → run `ffs serve`")
+
+    print("\n" + (f"✓ all set — open http://127.0.0.1:{port}" if state["ok"]
+                  else "✗ fix the ✗ items above, then re-run `ffs doctor`"))
+    return 0 if state["ok"] else 1
+
+
 def _which(name: str) -> str | None:
     from shutil import which
     return which(name)
@@ -257,12 +323,14 @@ def _build_parser() -> argparse.ArgumentParser:
     common(pb, index=True)
 
     common(sub.add_parser("status", help="show what's present"), export=True, index=True, spaces=True)
+    common(sub.add_parser("doctor", help="health check — what works + how to fix what doesn't"),
+           export=True, index=True, spaces=True)
     return ap
 
 
 _DISPATCH = {
     "parse": cmd_parse, "build": cmd_build, "embed": cmd_embed, "index": cmd_index,
-    "serve": cmd_serve, "share": cmd_share, "status": cmd_status,
+    "serve": cmd_serve, "share": cmd_share, "status": cmd_status, "doctor": cmd_doctor,
     "export-static": cmd_export_static, "publish": cmd_publish,
 }
 

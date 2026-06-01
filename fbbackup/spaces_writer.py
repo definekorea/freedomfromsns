@@ -63,7 +63,7 @@ def post_to_row(post: dict, source: str = "facebook-export") -> tuple[str, str]:
         "date": post["datetime"][:10],
         "type": post["type"],
         "fb_id": post["fb_id"],
-        "source": source,
+        "source": post.get("source") or source,
     }
     if post["group"]:
         props["group"] = post["group"]
@@ -93,6 +93,10 @@ def post_to_row(post: dict, source: str = "facebook-export") -> tuple[str, str]:
         lines.append(f"🔗 [{_label(l['name']) or l['url']}]({l['url']})")
     if post["place"] and post["place"]["name"]:
         lines.append(f"📍 {post['place']['name']}")
+    # Album membership — a plain body line (NOT markup-prefixed) so the album name
+    # is embedded + searchable ("Cambodia" finds the whole album) and shown.
+    if post.get("albums"):
+        lines.append(f"🗂 앨범: {', '.join(post['albums'])}")
     # The post's own Facebook permalink (reshares whose original the export drops
     # — opening it on Facebook shows the reshared original). Marked with 📘 so the
     # viewer renders it as a clean "view on Facebook" button (no web unfurl).
