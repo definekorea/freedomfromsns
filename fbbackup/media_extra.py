@@ -19,8 +19,6 @@ from pathlib import Path
 
 from .mojibake import fix
 
-_VIDEO_EXTS = {".mp4", ".mov", ".webm", ".avi", ".mkv", ".gif"}
-
 
 def _base(uri: str | None) -> str:
     return os.path.basename(uri or "")

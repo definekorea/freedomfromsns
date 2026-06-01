@@ -239,9 +239,9 @@ def _clear_ckpt(out_dir: Path) -> None:
 
 
 # ── unified API (used by the backend for the query, and embed() for the bulk) ─
-def embed_query(text: str, provider: str | None = None, key: str | None = None) -> list[float]:
+def embed_query(text: str, provider: str | None = None) -> list[float]:
     provider = provider or resolve_provider()
-    if provider == "gemini":  # keys resolved per provider (caller's key may be for another)
+    if provider == "gemini":  # keys resolved per provider
         return _gemini_one(text, gemini_key(), "RETRIEVAL_QUERY")
     if provider == "weft":
         return _weft_embed([text], weft_key())[0]

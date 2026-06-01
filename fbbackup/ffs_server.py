@@ -32,7 +32,6 @@ def create_app(spaces_root: Path, export_root: Path,
     # (added inside SpacesBackend) so `/api/fb/files` can serve archive photos.
     b = SpacesBackend(spaces_root, media_roots=[Path(export_root).expanduser()], prefix="/api/fb")
     b.register(app, prefix="/api/fb")
-    ffs_api.DEFAULT_MODEL = chat_model
     ffs_api.LOCAL_PORT = int(port)     # the port the publish tunnel points at
     ffs_api.register(app, b)
 

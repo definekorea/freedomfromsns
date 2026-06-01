@@ -153,9 +153,7 @@ class SpacesBackend:
     """Holds the data root + media allowlist; registers routes on an app."""
 
     def __init__(self, spaces_root: Path, media_roots: list[Path], write_token: str = "",
-                 prefix: str = "/api/fb", profile_url: str = "",
-                 llm_url: str = "", llm_key: str = "", embed_key: str = "",
-                 chat_model: str = "weft-mixed"):
+                 prefix: str = "/api/fb"):
         self.root = Path(spaces_root).expanduser().resolve()
         self.root.mkdir(parents=True, exist_ok=True)
         # Allowlisted roots for image serving: the vault (for _attachments) +
@@ -165,16 +163,6 @@ class SpacesBackend:
         # Route prefix — kept distinct from Weft's /api/wiki + /api/weft/files
         # so this can mount on the Weft dashboard app without colliding.
         self.prefix = prefix
-        self.profile_url = profile_url
-        # LLM for the archive chat (RAG). Empty url = chat disabled. `chat_model`
-        # is an apicascade tier: weft-mixed (free+paid → Opus 4.8 for subscribers,
-        # cascades to free for keyless deployers), weft-frontier, or auto.
-        self.llm_url = llm_url
-        self.llm_key = llm_key
-        self.chat_model = chat_model
-        # Mistral key for embedding the search/chat QUERY (same provider as the
-        # offline `fbbackup embed` step). Empty = semantic search disabled.
-        self.embed_key = embed_key
         # Per-workspace embeddings cache: workspace → {emb, ids, threshold, provider}.
         self._emb_cache: dict[str, dict] = {}
         # In-memory browse/search index (built once, lazily) — reading 5k+ .md
@@ -274,12 +262,6 @@ class SpacesBackend:
             return f"![{alt}]({files}?path={quote(str(p))})"
         return _IMG_RE.sub(_repl, content)
 
-    # ── database read/write (weftdb.py) ──────────────────────────────────────
-    def _row(self, workspace: str, p: Path) -> dict:
-        props, _ = _split_frontmatter(p.read_text(encoding="utf-8", errors="replace"))
-        title, summary = self._read_h1_and_summary(p)
-        return {"id": self._page_id(workspace, p), "title": title, "summary": summary, "props": props}
-
     def _resolve_links(self, workspace: str) -> dict[str, str]:
         out: dict[str, str] = {}
         for p in self._all_pages(workspace):
@@ -369,7 +351,7 @@ class SpacesBackend:
         try:
             import numpy as np
             from .embed import embed_query
-            v = np.asarray(embed_query(q, provider, self.embed_key), dtype="float32")
+            v = np.asarray(embed_query(q, provider), dtype="float32")
             return v / (np.linalg.norm(v) + 1e-9)
         except Exception:
             return None
@@ -410,39 +392,6 @@ class SpacesBackend:
         except Exception:
             pass
         return row.get("summary", "")
-
-    def _ask(self, question: str, workspace: str = "default", k: int = 8) -> dict:
-        hits = self._semantic(question, workspace, k=k)
-        if not hits:  # fall back to keyword
-            toks = [t for t in question.lower().split() if t]
-            hits = [r for r in self._ensure_index(workspace)["rows"] if toks and all(t in r["_blob"] for t in toks)][:k]
-        ctx = []
-        for r in hits[:k]:
-            body = " ".join(self._row_text(r).split())[:450]
-            ctx.append(f"[{r['props'].get('date', '?')}] {body}")
-        prompt = (
-            "You are helping the user explore their OWN Facebook post archive. Answer the question "
-            "using only the posts below; cite the relevant dates; if they don't cover it, say so. The "
-            "posts are often in Korean — reply in the user's language.\n\nRelevant posts:\n"
-            + "\n---\n".join(ctx) + f"\n\nQuestion: {question}\nAnswer:"
-        )
-        return {"answer": self._llm(prompt),
-                "sources": [{"id": r["id"], "title": r["title"], "year": r.get("year")} for r in hits[:k]]}
-
-    def _llm(self, prompt: str) -> str:
-        if not self.llm_url:
-            return "Chat isn't configured (no LLM endpoint)."
-        import urllib.request
-        try:
-            data = json.dumps({"model": self.chat_model, "messages": [{"role": "user", "content": prompt}],
-                               "temperature": 0.4, "max_tokens": 800}).encode()
-            req = urllib.request.Request(
-                self.llm_url.rstrip("/") + "/v1/chat/completions", data=data,
-                headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.llm_key}"})
-            with urllib.request.urlopen(req, timeout=90) as r:
-                return json.loads(r.read())["choices"][0]["message"]["content"]
-        except Exception as e:
-            return f"(LLM error: {str(e)[:140]})"
 
     def _ensure_index(self, workspace: str = "default") -> dict:
         # Double-checked locking: the common case (index already built) takes no
@@ -918,8 +867,7 @@ class SpacesBackend:
                 t = str(row["props"].get("type", ""))
                 types[t] = types.get(t, 0) + 1
             return {"total": len(idx["rows"]), "by_type": types,
-                    "years": sorted(idx["by_year"].keys(), reverse=True),
-                    "profile_url": b.profile_url}
+                    "years": sorted(idx["by_year"].keys(), reverse=True)}
 
         @r.get("/search")
         def search(q: str, limit: int = 300, semantic: bool = True, workspace: str = "default"):
@@ -933,13 +881,6 @@ class SpacesBackend:
                 related = [b._public(r) for r in b._semantic(q, workspace, k=40, exclude=kw_ids)]
             return {"q": q, "total": len(kw), "rows": [b._public(r) for r in kw[:limit]],
                     "related": related}
-
-        @r.post("/ask")
-        def ask(payload: dict, workspace: str = "default"):
-            q = (payload.get("question") or "").strip()
-            if not q:
-                raise HTTPException(400, "question required")
-            return b._ask(q, workspace)
 
         @r.post("/reindex")
         def reindex(request: Request, workspace: str = "default"):
