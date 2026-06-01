@@ -20,7 +20,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 _PKG = Path(__file__).resolve().parent
-_VIEWER = _PKG.parent / "viewer"
+_VIEWER = _PKG / "viewer"   # bundled inside the package (see ffs_server)
 
 
 def load_index(out_dir: Path) -> tuple[list[dict], dict[str, str]]:

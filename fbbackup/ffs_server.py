@@ -19,7 +19,7 @@ from . import ffs_api
 from .spaces_backend import SpacesBackend
 
 _PKG = Path(__file__).resolve().parent
-_VIEWER = _PKG.parent / "viewer"
+_VIEWER = _PKG / "viewer"   # bundled inside the package so a `uv tool install` is self-contained
 
 
 def create_app(spaces_root: Path, export_root: Path,
@@ -101,12 +101,14 @@ def serve(spaces_root: Path, export_root: Path, host: str = "127.0.0.1",
           reload: bool = False) -> None:
     import uvicorn
     if reload:
-        # auto-reload on Python edits only (watch the package, not viewer/ — the
-        # frontend is static + cache-busted, so it never needs a server restart).
+        # auto-reload on Python edits only — uvicorn's reload default is *.py, so the
+        # bundled viewer/ (now inside the package) is watched but its css/js edits
+        # don't restart the server; the frontend is static + cache-busted.
         os.environ["FFS_SPACES"] = str(spaces_root)
         os.environ["FFS_EXPORT"] = str(export_root)
         os.environ["FFS_CHAT_MODEL"] = chat_model
         uvicorn.run("fbbackup.ffs_server:_reload_app", factory=True, host=host,
-                    port=port, reload=True, reload_dirs=[str(_PKG)])
+                    port=port, reload=True, reload_dirs=[str(_PKG)],
+                    reload_includes=["*.py"])
     else:
         uvicorn.run(create_app(spaces_root, export_root, chat_model), host=host, port=port)

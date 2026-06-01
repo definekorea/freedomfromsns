@@ -25,23 +25,52 @@ See [`docs/principles.md`](docs/principles.md).
 - **Rich browsing** — grid + calendar, instant keyword + semantic search, link
   previews, video posters, a full-screen image lightbox with a position scrubber.
 
-## Setup
+## Install
 
+One command — it installs a managed Python via [`uv`](https://docs.astral.sh/uv/),
+then FreedomFromSNS (from the latest GitHub Release — no PyPI, no git, nothing to
+compile), then launches the wizard. You only need this command + your Facebook
+download; an API key is optional.
+
+**Windows** (native — no WSL, no Docker):
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/definekorea/freedomfromsns/master/install-ffs.ps1 | iex"
+```
+
+**macOS / Linux:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/definekorea/freedomfromsns/master/install-ffs.sh | sh
+```
+
+State (config, index, archive) lives in `~/FreedomFromSNS/`. The wizard
+auto-locates your export, so there's nothing to configure by hand.
+
+### From source (development)
 ```bash
 python3 -m venv .venv && . .venv/bin/activate
 pip install -e .
-echo "GEMINI_PAID_API_KEY=your-key-here" > .env   # one key, that's it
+ffs setup          # or edit config.toml → [export].root yourself
 ```
 
-Edit `config.toml` → `[export].root` to point at your unzipped export
-(forward slashes, e.g. `D:/dev/facebook-data`).
-
 ## Use
+
+The easy path — one command, English or 한국어, no AI key needed:
+
+```bash
+ffs setup     # find your export → build → open the browser at Tier 0
+```
+
+It auto-locates your Facebook download, parses + builds your timeline, and opens
+it at `http://localhost:8282`. **Browse, filter, and keyword search work
+immediately, with no API key.** Semantic search and AI chat are optional unlocks
+offered in-app (a one-time local model download, or a free key).
+
+Or run the steps by hand:
 
 ```bash
 ffs parse     # export JSON → index/posts.jsonl
 ffs build     # → spaces-data/<year>/*.md
-ffs embed     # → index/embeddings.npy   (Gemini; resumable)
+ffs embed     # → index/embeddings.npy   (semantic search; resumable)
 ffs serve     # → http://localhost:8282
 #   ffs index    runs parse + build + embed in one go
 #   ffs status   shows what's present

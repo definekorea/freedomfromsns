@@ -1,5 +1,6 @@
 """fbbackup CLI — turn a Facebook export into a browsable, searchable archive.
 
+    fbbackup setup     first-run wizard: find data → build → open (Tier 0)
     fbbackup parse     export JSON  → index/posts.jsonl + media-manifest
     fbbackup build     index        → spaces-data/<year>/*.md  (markdown rows)
     fbbackup embed     spaces-data  → index/embeddings.npy  (semantic search)
@@ -25,7 +26,18 @@ from pathlib import Path
 
 
 def _home() -> Path:
-    return Path(os.environ.get("FBBACKUP_HOME", Path.cwd())).expanduser()
+    """Where state lives (config.toml, index/, spaces-data/, .env).
+
+    Resolution: FBBACKUP_HOME wins; else if the current dir is a project (has a
+    config.toml) use it — the dev/repo workflow; else a stable per-user dir,
+    ~/FreedomFromSNS, so an installed `ffs` run from any cwd always finds its data
+    instead of scattering state wherever it was launched."""
+    env = os.environ.get("FBBACKUP_HOME")
+    if env:
+        return Path(env).expanduser()
+    if (Path.cwd() / "config.toml").is_file():
+        return Path.cwd()
+    return Path.home() / "FreedomFromSNS"
 
 
 def _load_env() -> None:
@@ -140,6 +152,115 @@ def cmd_serve(args) -> int:
     print(f"FreedomFromSNS → http://{host}:{port}  (chat: {chat_model}; Ctrl-C to stop)", flush=True)
     serve(p["spaces"], p["export"], host=host, port=port, chat_model=chat_model,
           reload=bool(getattr(args, "reload", False)))
+    return 0
+
+
+def cmd_setup(args) -> int:
+    """First-run wizard: pick a language, auto-locate the Facebook export, then
+    parse + build and open the browser at Tier 0 (browse + keyword search — no
+    AI key, no model download). Semantic search and chat are optional in-app
+    unlocks. The goal is the fewest possible questions before the archive appears.
+    """
+    from fbbackup import setup as wiz
+    from fbbackup.parse import parse
+    from fbbackup.materialize import materialize
+
+    home = _home()
+    home.mkdir(parents=True, exist_ok=True)   # first run: create the per-user state dir
+    lang = args.lang or wiz.detect_lang()
+    if not args.lang and not args.yes:  # offer a language choice unless told
+        try:
+            pick = input(wiz.t(lang, "lang_prompt", d=("한국어" if lang == "ko" else "English"))).strip()
+            lang = {"1": "en", "2": "ko"}.get(pick, lang)
+        except EOFError:
+            pass
+
+    def say(key, **kw):
+        print(wiz.t(lang, key, **kw), flush=True)
+
+    say("welcome")
+
+    # 1. Find the data — ask nothing if exactly one export is found.
+    if args.export:
+        chosen_root = _abs(args.export)
+    else:
+        say("searching")
+        cands = wiz.locate_export()
+        chosen = None
+        if len(cands) == 1 or (cands and args.yes):
+            chosen = cands[0]
+            say("found_one", path=chosen.get("marker", chosen["root"]))
+        elif len(cands) > 1:
+            say("found_many", n=len(cands))
+            for i, c in enumerate(cands, 1):
+                print(f"    [{i}] {c.get('marker', c['root'])}"
+                      f"{'  (zip)' if c['kind'] == 'zip' else ''}", flush=True)
+            try:
+                sel = input(wiz.t(lang, "choose")).strip()
+            except EOFError:
+                sel = ""
+            idx = (int(sel) - 1) if sel.isdigit() and 1 <= int(sel) <= len(cands) else 0
+            chosen = cands[idx]
+        if chosen is None:
+            say("none_found")
+            try:
+                manual = input(wiz.t(lang, "enter_path")).strip()
+            except EOFError:
+                manual = ""
+            if not manual:
+                return 2
+            chosen = {"kind": "folder", "root": _abs(manual)}
+        if chosen["kind"] == "zip":
+            say("unzipping", path=chosen["root"])
+            chosen_root = wiz.unzip_export(Path(chosen["root"]), home)
+        else:
+            chosen_root = Path(chosen["root"])
+
+    wiz.set_export_root(home, chosen_root)
+    say("using", path=chosen_root)
+
+    # 2. Process to Tier 0 — parse + build (fast, deterministic; no embedding).
+    p = _paths(args)  # re-reads config.toml → now points at the chosen export
+    if not p["export"].is_dir():
+        say("not_export")
+        return 2
+    import contextlib
+    import io
+    say("parsing")
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):  # keep the wizard's output clean + localized
+            res = parse(p["export"], p["index"])
+    except SystemExit as e:
+        say("no_posts")
+        if e.code:
+            print(str(e.code), file=sys.stderr)
+        return 2
+    say("parsed", n=res.get("posts", "?"))
+    say("building")
+    with contextlib.redirect_stdout(io.StringIO()):
+        bres = materialize(p["index"], p["spaces"])
+    say("built", n=bres.get("written", "?"))
+
+    # 3. Tier 0 is ready; AI tiers are optional unlocks (surfaced in-app).
+    say("tier0")
+    say("tier1_hint")
+    say("tier2_hint")
+
+    # 4. Open the browser and serve (the wow moment).
+    if args.no_serve:
+        return 0
+    from fbbackup.ffs_server import serve
+    cfg_serve = p["cfg"].get("serve", {})
+    chat_model = (p["cfg"].get("gemini", {}) or {}).get("chat_model", "gemini-flash-latest")
+    host = args.host or cfg_serve.get("host", "127.0.0.1")
+    port = int(args.port or cfg_serve.get("port", 8282))
+    url = f"http://{host}:{port}"
+    say("opening", url=url)
+    if not args.no_open:
+        import threading
+        import webbrowser
+        threading.Timer(1.5, lambda: webbrowser.open(url)).start()  # after the server is up
+    serve(p["spaces"], p["export"], host=host, port=port, chat_model=chat_model)
     return 0
 
 
@@ -299,6 +420,14 @@ def _build_parser() -> argparse.ArgumentParser:
         if spaces:
             sp.add_argument("--spaces", help="spaces-data dir (markdown rows)")
 
+    st = sub.add_parser("setup", help="first-run wizard: find data → build → open (Tier 0)")
+    common(st, export=True, index=True, spaces=True)
+    st.add_argument("--lang", choices=["en", "ko"], help="UI language (default: OS locale)")
+    st.add_argument("--yes", action="store_true", help="non-interactive: accept the newest export found")
+    st.add_argument("--host"); st.add_argument("--port")
+    st.add_argument("--no-serve", action="store_true", help="stop after build; don't start the server")
+    st.add_argument("--no-open", action="store_true", help="serve but don't auto-open a browser")
+
     common(sub.add_parser("parse", help="export → index/posts.jsonl"), export=True, index=True)
     common(sub.add_parser("build", help="index → spaces-data markdown rows"), index=True, spaces=True)
     common(sub.add_parser("embed", help="spaces-data → embeddings.npy"), index=True, spaces=True)
@@ -332,6 +461,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 _DISPATCH = {
+    "setup": cmd_setup,
     "parse": cmd_parse, "build": cmd_build, "embed": cmd_embed, "index": cmd_index,
     "serve": cmd_serve, "share": cmd_share, "status": cmd_status, "doctor": cmd_doctor,
     "export-static": cmd_export_static, "publish": cmd_publish,

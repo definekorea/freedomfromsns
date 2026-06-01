@@ -30,7 +30,7 @@
       public: "공개", private: "비공개", privacy_hint: "공개 설정 — 비공개 글은 공유·내보내기에서 제외됩니다 (내 컴퓨터에서는 계속 보입니다)",
       jump_latest: "최신으로 ↓",
       load_body_fail: "본문을 불러올 수 없습니다.", related: "관련 글", link_preview: "링크 미리보기…",
-      source_fallback: "원본", lb_goto: "위치로 이동", original_short: "원문 ↗", untitled: "(무제)",
+      source_fallback: "원본", lb_goto: "위치로 이동", original_short: "원문 ↗", untitled: "(무제)", lb_expand: "전체화면으로 보기",
       chat_hi: "✦ 내 기록과 대화하기",
       chat_sub: "내 페이스북 기록을 근거로 답합니다. 사진·영상도 함께 찾아 보여줘요. 무엇이든 물어보세요.",
       chat_eg1: "내가 올린 여행 사진들 보여줘", chat_eg2: "내가 가장 많이 쓴 주제는?", chat_eg3: "2015년에 무슨 일이 있었지?",
@@ -63,7 +63,7 @@
       public: "Public", private: "Private", privacy_hint: "Privacy — private posts are excluded from sharing/export (still visible on your computer)",
       jump_latest: "Jump to latest ↓",
       load_body_fail: "Couldn't load the post.", related: "Related", link_preview: "Link preview…",
-      source_fallback: "Source", lb_goto: "Jump to position", original_short: "Original ↗", untitled: "(untitled)",
+      source_fallback: "Source", lb_goto: "Jump to position", original_short: "Original ↗", untitled: "(untitled)", lb_expand: "View full screen",
       chat_hi: "✦ Chat with my archive",
       chat_sub: "Answers grounded in your Facebook archive — it finds your photos and videos too. Ask anything.",
       chat_eg1: "Show my travel photos", chat_eg2: "What did I write about most?", chat_eg3: "What happened in 2015?",
@@ -102,6 +102,7 @@
     semanticIds: null,          // semantic results for the current query (null = none/keyword)
     semanticLoading: false, searchToken: 0,
     ctx: null,                  // ordered post ids for detail prev/next (current context)
+    ctxMedia: null,             // {key, p:Promise<{list,byUrl}>} — category-wide media for the lightbox
     selMode: false, sel: {}, selAnchor: null,   // multi-select: mode, {id:true}, range anchor
     logo: (function () { try { return parseInt(localStorage.getItem("ffs.logo"), 10) || 0; } catch (e) { return 0; } })(),
     theme: (function () { try { return parseInt(localStorage.getItem("ffs.theme"), 10) || 0; } catch (e) { return 0; } })(),
@@ -841,10 +842,25 @@
         md = md.replace(/\[▶[^\]]*\]\((\/api\/fb\/files[^)\s]+)\)/g, function (_, u) { vids.push(u); return ""; });
         content.innerHTML = mdToHtml(md);
         body.appendChild(content);
-        vids.forEach(function (u, vi) { var v = el("video", "fb-doc-vid"); v.src = u; v.controls = true; v.preload = "metadata"; v.playsInline = true; if (vi === 0) v.autoplay = true; content.appendChild(v); if (vi === 0) v.play().catch(function () { }); });
+        // This post's own media, in body order (images then videos) — the instant
+        // fallback before the category-wide list (warmed by openPost) arrives.
         var imgs = content.querySelectorAll("img.fb-md-img");
         var media = []; imgs.forEach(function (im) { media.push({ url: im.getAttribute("src"), type: "image", post_id: id, post_title: obj.title || "" }); });
-        imgs.forEach(function (im, ix) { im.style.cursor = "zoom-in"; im.onclick = function () { openLightbox(media, ix); }; });
+        var imgN = media.length;
+        vids.forEach(function (u) { media.push({ url: u, type: "video", post_id: id, post_title: obj.title || "" }); });
+        imgs.forEach(function (im, ix) { im.style.cursor = "zoom-in"; im.onclick = function () { openMediaLightbox(media, ix, im.getAttribute("src")); }; });
+        // Keep inline video players (first autoplays), plus a ⛶ button that opens the
+        // category lightbox at that video — so 영상 navigates the whole category too.
+        vids.forEach(function (u, vi) {
+          var wrap = el("div", "fb-doc-vidwrap");
+          var v = el("video", "fb-doc-vid"); v.src = u; v.controls = true; v.preload = "metadata"; v.playsInline = true; if (vi === 0) v.autoplay = true;
+          wrap.appendChild(v);
+          var exp = el("button", "fb-doc-videxpand", "⛶"); exp.title = tr("lb_expand");
+          exp.onclick = (function (idx, url) { return function () { openMediaLightbox(media, idx, url); }; })(imgN + vi, u);
+          wrap.appendChild(exp);
+          content.appendChild(wrap);
+          if (vi === 0) v.play().catch(function () { });
+        });
         appendLinkPreviews(content);
         appendRelated(doc, id);
       })
@@ -919,11 +935,47 @@
   function openPost(id, ctxIds) {
     id = String(id);
     S.ctx = (ctxIds && ctxIds.length) ? ctxIds.map(String) : null;   // null → no prev/next
+    ensureCtxMedia(S.ctx);                                           // warm the category media for the lightbox
     if (location.hash.indexOf("#post/") === 0) { history.replaceState(null, "", "#post/" + encodeURIComponent(id)); openDetail(id); }
     else location.hash = "#post/" + encodeURIComponent(id);
   }
 
   function mediaIndex(media, url) { for (var i = 0; i < media.length; i++) if (media[i].url === url) return i; return -1; }
+
+  /* ── category-wide media for the lightbox ────────────────────────────────────
+     Full-screen navigation should walk EVERY photo/video in the current category
+     (사진/영상/글/링크/공유/미분류 …), not just the few on one post. Fetch the flat media
+     list for the posts on screen (the active context) once, cache it, then open the
+     lightbox positioned at the clicked item. */
+  function ctxMediaKey(ids) { return ids.length + "|" + (ids[0] || "") + "|" + (ids[ids.length - 1] || ""); }
+  function ensureCtxMedia(ids) {
+    if (!ids || !ids.length) { S.ctxMedia = null; return null; }
+    var key = ctxMediaKey(ids);
+    if (S.ctxMedia && S.ctxMedia.key === key) return S.ctxMedia.p;       // cached for this context
+    var p = fetch("/api/media", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: ids }) })
+      .then(function (r) { return r.json(); })
+      .then(function (list) {
+        var byUrl = {}; for (var i = 0; i < list.length; i++) if (byUrl[list[i].url] == null) byUrl[list[i].url] = i;
+        return { list: list, byUrl: byUrl };
+      }).catch(function () { return null; });
+    S.ctxMedia = { key: key, p: p };
+    return p;
+  }
+  // Show the post's OWN media instantly, then upgrade to the whole category (kept on
+  // the same item) once loaded — so opening is never blocked on the category fetch.
+  function openMediaLightbox(localItems, idx, url) {
+    openLightbox(localItems, idx);
+    var p = S.ctxMedia && S.ctxMedia.p;
+    if (!p) return;
+    p.then(function (full) {
+      if (!full || !full.list.length || !S.lb) return;
+      var gi = full.byUrl[url];
+      if (gi == null) return;                                            // clicked item not in context → keep local
+      if (S.lb.items[S.lb.i] && S.lb.items[S.lb.i].url === url) {        // still on the clicked item → expand
+        S.lb.items = full.list; S.lb.i = gi; lbRender(); renderLbThumbs();
+      }
+    });
+  }
 
   /* ── lightbox: full-screen media viewer with prev/next, thumb strip, swipe ── */
   function buildLightbox() {

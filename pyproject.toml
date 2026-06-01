@@ -11,6 +11,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Video poster-frame thumbnails without a system ffmpeg install. Bundles a
+# static ffmpeg per-OS (~60 MB); spaces_backend prefers a system ffmpeg and
+# falls back to this. Frictionless video thumbs on native Windows/macOS.
+media = ["imageio-ffmpeg>=0.5"]
 # Local, no-key embeddings on CPU (fastembed/ONNX). Remote providers
 # (gemini / apicascade) need neither — they're pure HTTP.
 local = ["fastembed>=0.3"]
@@ -28,3 +32,10 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 packages = ["fbbackup"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+# Ship the single-page viewer (html/js/css + fonts, themes, logos) inside the
+# wheel so `uv tool install` / `pip install` is fully self-contained — the server
+# resolves these package-relative, not from the source tree.
+fbbackup = ["viewer/**/*"]

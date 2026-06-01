@@ -46,10 +46,49 @@ _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}")
 _WIKILINK_RE = re.compile(r"\[\[([^\]]+?)\]\]")
 _H1_RE = re.compile(r"^#\s+(.+?)\s*$", re.MULTILINE)
 _IMG_RE = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)")
+_VID_MD_RE = re.compile(r"\[▶[^\]]*\]\(([^)\s]+)\)")  # local-video markup in a row body
 _IMG_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 _VID_EXTS = {".mp4", ".mov", ".webm"}
+
+
+def _media_items(body: str) -> list[dict]:
+    """Flat media list from a row's md body — images then videos — as
+    ``{url, thumb, type}``. URLs are already ``/api/fb/files?path=…`` in the md
+    (written by build); the thumb is the same path at display width (image) or
+    its poster frame (video). Powers category-wide lightbox navigation."""
+    out: list[dict] = []
+    for m in _IMG_RE.finditer(body):
+        u = m.group(2).strip()
+        out.append({"url": u, "thumb": u + "&w=400", "type": "image"})
+    for m in _VID_MD_RE.finditer(body):
+        u = m.group(1).strip()
+        out.append({"url": u, "thumb": u.replace("/fb/files?", "/fb/vthumb?") + "&w=400",
+                    "type": "video"})
+    return out
 _LOOPBACK = ("127.0.0.1", "::1", "localhost", None, "")
 _THUMB_MIN_W, _THUMB_MAX_W = 64, 1024
+
+_FFMPEG_EXE: str | None | bool = False  # False = unresolved; None = absent; str = path
+
+
+def _ffmpeg_exe() -> str | None:
+    """Path to an ffmpeg binary, or None if none is available. Prefers a system
+    ffmpeg; else falls back to the static binary bundled by ``imageio-ffmpeg``
+    (the ``media`` extra), so video posters work on native Windows/macOS without
+    a system ffmpeg install. Resolved once, then cached."""
+    global _FFMPEG_EXE
+    if _FFMPEG_EXE is not False:
+        return _FFMPEG_EXE  # type: ignore[return-value]
+    import shutil
+    exe = shutil.which("ffmpeg")
+    if not exe:
+        try:
+            import imageio_ffmpeg
+            exe = imageio_ffmpeg.get_ffmpeg_exe()
+        except Exception:  # noqa: BLE001 — not installed / no bundled binary
+            exe = None
+    _FFMPEG_EXE = exe
+    return exe
 
 
 # ── frontmatter + type inference (weftdb.py) ─────────────────────────────────
@@ -285,6 +324,8 @@ class SpacesBackend:
                         "preview": text_content[:300],
                         "props": props, "year": yr, "empty": empty,
                         "_blob": (title + " " + body + " " + tagstr).lower(),
+                        # every photo/video in the post, for category-wide lightbox
+                        "media": _media_items(body),
                     }
                     rows.append(row)
                     by_year.setdefault(yr, []).append(row)
@@ -409,6 +450,22 @@ class SpacesBackend:
                     self._save_index_cache(workspace)
             return self._indexes[workspace]
 
+    def media_for_ids(self, ids: list[str], workspace: str = "default") -> list[dict]:
+        """Flat, ordered media for a list of post ids (the caller's display order),
+        each item tagged with its source post so the lightbox can link back. Powers
+        category-wide navigation: the client passes the ids currently on screen."""
+        byid = self._ensure_index(workspace)["by_id"]
+        out: list[dict] = []
+        for rid in ids:
+            r = byid.get(str(rid))
+            if not r:
+                continue
+            title = r.get("title", "")
+            for m in r.get("media", []):
+                out.append({"url": m["url"], "thumb": m["thumb"], "type": m["type"],
+                            "post_id": rid, "post_title": title})
+        return out
+
     # ── on-disk index cache ──────────────────────────────────────────────────
     # Building the index parses 24k frontmatter blocks (~4s). A restart that
     # doesn't change the data shouldn't pay that — pickle the built index, keyed
@@ -432,7 +489,8 @@ class SpacesBackend:
                     n += 1
                     if mt > newest:
                         newest = mt
-        return [n, newest]
+        # "v2" busts caches written before rows carried a per-post `media` list.
+        return ["v2", n, newest]
 
     def _load_index_cache(self, workspace: str) -> bool:
         path = self._index_cache_path(workspace)
@@ -622,9 +680,9 @@ class SpacesBackend:
         """A poster frame for a local video — grab a frame a couple seconds in
         (past black intros) via ffmpeg, scaled to width w, cached as WebP."""
         import hashlib
-        import shutil
         import subprocess
-        if not shutil.which("ffmpeg"):
+        ffmpeg = _ffmpeg_exe()
+        if not ffmpeg:
             return None
         try:
             st = abs_path.stat()
@@ -635,7 +693,7 @@ class SpacesBackend:
                 return out
             cache.mkdir(parents=True, exist_ok=True)
             tmp = out.with_name(out.name + ".tmp.webp")
-            cmd = ["ffmpeg", "-y", "-loglevel", "error", "-ss", "2", "-i", str(abs_path),
+            cmd = [ffmpeg, "-y", "-loglevel", "error", "-ss", "2", "-i", str(abs_path),
                    "-frames:v", "1", "-vf", f"scale={w}:-2", "-f", "webp", str(tmp)]
             subprocess.run(cmd, timeout=25, check=True, capture_output=True)
             if tmp.is_file() and tmp.stat().st_size > 0:

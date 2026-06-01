@@ -326,6 +326,18 @@ def register(app: FastAPI, b) -> None:
         set_erased(b, fbids, flag)
         return {"fbids": fbids, "erased": flag, "count": len(fbids)}
 
+    @app.post("/api/media")
+    async def media(request: Request):
+        """Flat, ordered media for the posts currently on screen, so the lightbox
+        can walk every photo/video in a category — not just one post's. Body:
+        ``{ids:[…]}`` in display order (the client's filtered/searched context)."""
+        try:
+            body = await request.json()
+        except Exception:  # noqa: BLE001
+            body = {}
+        ids = [str(x) for x in (body or {}).get("ids", []) if x][:100000]
+        return JSONResponse(b.media_for_ids(ids))
+
     @app.post("/api/search")
     async def search(request: Request):
         try:

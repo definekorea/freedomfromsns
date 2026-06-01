@@ -16,13 +16,39 @@ the roadmap. Each section marks ✅ done / 🔜 to build.
 ## 0. The ideal flow (what we're building toward)
 
 ```
-download FB data ──► run one installer ──► wizard finds the data + connects an AI
-   ──► it processes (parse → build → embed) ──► a browser opens at localhost
-   ──► guided tour of browse / search / chat ──► (optional) "Publish online"
-   ──► public URL; if chat is exposed, it's throttled + topic-locked
+download FB data ──► run one installer (picks language: English / 한국어)
+   ──► it finds the data ──► processes (parse → build) ──► browser opens at
+   localhost: YOUR ARCHIVE, LIVE — browse · filter · timeline · keyword search,
+   with NO key, NO model download, NO wait
+   ──► in-app, OPTIONAL "Smarter search?" — hardware-aware: a capable GPU/CPU →
+       local embedding model (no key); otherwise → a free Gemini / Mistral key
+   ──► in-app, OPTIONAL "Chat with your archive" — connect an AI (free or paid key)
+   ──► (optional) "Publish online" → public URL (if chat is on: throttled + topic-locked)
 ```
 
-One install command. One wizard. No hand-installing Python, ffmpeg, or a venv.
+One install command. No hand-installing Python, ffmpeg, or a venv. **The wow
+moment — the user's real posts on screen — comes first and needs nothing.**
+Everything AI is an *optional unlock* surfaced in-app, never a gate.
+
+### 0.1 Feature tiers — the unlock ladder
+
+Each tier is independently optional and **never blocks the tier below it**
+(offline, no key, or a failed model download → the tier below still fully works).
+The engine already supports this split — `embed.py:resolve_provider()` falls back
+`gemini → weft → local`, browse/keyword-search touch no key or embeddings, and
+`_semantic()` degrades to empty gracefully. What's new is the *packaging default*
+(Tier 0 = pure wheels) and the *framing* (AI is a surfaced unlock, not step 2).
+
+| Tier | Name (plain language) | Needs | Unlocks |
+|---|---|---|---|
+| **0** | **Your archive** | nothing — no key, no download, no questions | Browse · timeline/calendar · filter · **keyword search** · galleries · lightbox · link previews · video posters |
+| **1** | **Smart search** | no key; an in-app opt-in. **Hardware-aware:** capable GPU/CPU → one-time local-model download (no key); weak hardware → a free Gemini / Mistral key | Meaning-based / semantic search |
+| **2** | **Chat with your archive** | an AI connection (free Google key or your own) | RAG chat · agentic tool-loop · the "talk to your own posts" experience |
+
+**Decision (locked):** Tier 1 is **opt-in**, not bundled — the basic install is
+pure-Python wheels (tiny, instant), and "Smarter search?" is an in-app card that
+either downloads the local model **or** connects a key. Keeps the default install
+the smallest and most frictionless; semantic search is one click away.
 
 ---
 
@@ -133,24 +159,40 @@ fallback (localized/redirected Downloads).
 
 ## 4. The setup wizard (`ffs setup`)  🔜 (extends the existing `ffs doctor`)
 
-Jargon-free, steers by intent (never "Mode A/B", never "cascade tier"):
+Jargon-free, steers by intent (never "Mode A/B", never "cascade tier"). The
+guiding rule: **get to the archive on screen with the fewest possible questions**,
+then surface AI as optional unlocks (the §0.1 ladder) — don't gate the wow moment
+on a key.
 
-1. **Find your data** — auto-locate (§3); confirm.
-2. **Connect an AI** — three plain choices:
-   - *Keep it free* → open the Gemini key page, paste the key (covers **chat**
-     *and* **embeddings**, no download). **Recommended.**
-   - *I'll pay per use* → DeepSeek / OpenAI / etc. (the Settings provider list).
-   - *Fully offline* → local fastembed embeddings (installs the `local` extra,
-     downloads the model once) + a local chat model (Ollama) or no chat.
-   > Embeddings need *some* provider; Gemini's free key is the zero-friction
-   > default (no model download). See `settings.md` / the in-app ⚙ Settings.
-3. **Process** — `parse → build → embed` with a progress bar; resumable.
-4. **Open** — start the server and open `http://127.0.0.1:8282` in the browser.
-5. **Tour** — a first-run overlay points at Browse / Search / the ✦ AI chat /
+0. **Language** — first prompt (and only because it changes everything after):
+   *English / 한국어*. Default from the OS locale (`LANG` / Windows UI language);
+   the installer scripts, wizard prompts, and the app UI all honor it. (Bilingual
+   KO+EN is a North Star commitment — see `principles.md`; today the UI is
+   Korean-only, so this is a **gap to close**.)
+1. **Find your data** — auto-locate (§3). If exactly one export is found, use it
+   and **ask nothing**; only prompt if zero or ambiguous.
+2. **Process (Tier 0)** — `parse → build` (fast, deterministic), then **open the
+   browser immediately** at `http://127.0.0.1:8282`. The archive is now live:
+   browse · filter · timeline · keyword search. **No key, no model, no wait.**
+3. **Offer "Smarter search?" (Tier 1, optional)** — an in-app card, **hardware-aware**:
+   - **Capable GPU** detected (CUDA, enough VRAM) → recommend the **local model**
+     (`gpu` extra, no key); embeds in the **background** with a progress pill,
+     never blocking browse.
+   - **Capable CPU, no GPU** → offer the local model (`local` extra, CPU) **or** a
+     free cloud key — let the user pick by patience vs. privacy.
+   - **Weak hardware** → recommend a **free cloud key (Gemini / Mistral)** instead
+     of a slow local embed.
+   > Always labeled *optional* — keyword search already works. Embedding runs in
+   > the background and is resumable; the archive stays fully usable throughout.
+4. **Offer "Chat with your archive" (Tier 2, optional)** — a dismissible card:
+   connect an AI (free Google key, or your own paid key) to chat with your posts.
+   Never required; the card persists so it can be done later.
+5. **Tour** — a first-run overlay points at Browse / Search / the ✦ AI unlocks /
    ⚙ Settings / and the **Publish** button.
 
 `ffs doctor` (✅ exists) stays as the "what's wrong / what's missing" check the
-wizard and support both lean on.
+wizard and support both lean on — including the **hardware probe** (GPU/VRAM,
+CPU) that drives the Tier-1 recommendation, and the OS locale it reads for §0.
 
 ---
 
@@ -249,14 +291,36 @@ Implementation hooks (small, all in `ffs_api`):
 
 ## 7. Build order (suggested)
 
-1. **`imageio-ffmpeg` fallback** + a `media` extra (frictionless video thumbs). (S)
-2. **`uv`-based installers** `install-ffs.{ps1,sh}` + `pyproject` console entry. (M)
-3. **`ffs setup` wizard** + **auto-locate** the FB export (§3–4). (M)
-4. **First-run browser tour** + the **Publish** button in the dashboard. (M)
-5. **Public mode** for the chat (throttle + topic-lock + cost cap) (§6). (M)
-6. **Named-tunnel helper** (`ffs publish --target cloudflare-tunnel`) that scripts
+Reordered around the §0.1 ladder: **ship Tier 0 the fastest, make AI an unlock.**
+
+1. ✅ **`imageio-ffmpeg` fallback** + a `media` extra (frictionless video thumbs). (S) — done.
+2. ✅ **`uv`-based installers** `install-ffs.{ps1,sh}` + `pyproject` console entry —
+   default install is **pure wheels (Tier 0)**, no `local`/`gpu`/`media` extras. (M) — done.
+   The viewer is now bundled **inside** the package (`fbbackup/viewer/`, shipped via
+   package-data) so `uv tool install` is fully self-contained; state lives in a
+   stable per-user `~/FreedomFromSNS/` (cwd-independent). Verified end-to-end:
+   wheel → isolated venv → serves the viewer + 24k-post index from any cwd.
+3. ✅ **`ffs setup` wizard** (§4): installer **i18n** (§0 step 0, OS-locale default) +
+   **auto-locate** the export (§3) + `parse → build` + **open browser at Tier 0**
+   before any embedding. The wow moment, zero-key, fewest questions. (M) — done.
+   *Distribution = **GitHub Releases**, not PyPI (less setup, no namespace): the
+   installer resolves the latest release's wheel via the GitHub API and `uv tool
+   install`s it straight from the HTTPS asset URL — no git, no clone, no PyPI. The
+   end-user one-liner is `curl …/install-ffs.sh | sh` (or the `.ps1` via `irm | iex`).
+   Remaining for "any newcomer": the repo must be **public**, and each version cut
+   as a release: `uv build --wheel && gh release create vX.Y.Z dist/*.whl`.*
+4. **Hardware probe** in `ffs doctor` (GPU/VRAM/CPU) → drives the in-app
+   **"Smarter search?" (Tier 1)** card: local model vs. free cloud key (§4 step 3). (M)
+5. **Mistral embedding provider** in `embed.py` (alongside gemini/weft/local) so the
+   weak-hardware route offers Gemini **or** Mistral. (S)
+6. **Background, resumable embedding** surfaced as an in-app progress pill, so Tier 1
+   never blocks browse. (S–M; `embed` is already resumable.)
+7. **"Chat with your archive" (Tier 2)** unlock card + **Public mode** for the chat
+   (throttle + topic-lock + cost cap) (§6). (M)
+8. **First-run browser tour** + the **Publish** button in the dashboard. (M)
+9. **Named-tunnel helper** (`ffs publish --target cloudflare-tunnel`) that scripts
    Level 2 + writes a `config.yml` + optional service install. (M)
-7. **Dockerfile + compose** for always-on. (S)
+10. **Dockerfile + compose** for always-on. (S)
 
 ---
 
@@ -267,3 +331,4 @@ Implementation hooks (small, all in `ffs_api`):
   <https://developers.cloudflare.com/cloudflare-one/faq/cloudflare-tunnels-faq/>
 - imageio-ffmpeg (bundled static ffmpeg): <https://github.com/imageio/imageio-ffmpeg>, <https://pypi.org/project/imageio-ffmpeg/>
 - Cloudflare Access (Zero Trust, free tier) for gating the public site.
+- Mistral embeddings (`mistral-embed`) — cloud route for the weak-hardware Tier-1 option: <https://docs.mistral.ai/capabilities/embeddings/>

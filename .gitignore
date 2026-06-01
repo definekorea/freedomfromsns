@@ -12,3 +12,7 @@ embed.log
 serve.log
 nohup.out
 settings.json
+build/
+dist/
+.playwright-mcp/
+fbbackup.egg-info/
