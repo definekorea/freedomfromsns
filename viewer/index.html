@@ -15,10 +15,24 @@
       object: "/api/fb/objects/",   // + id → post detail (markdown body)
       unfurl: "/api/fb/unfurl",     // ?url= → link preview (OG + Wayback fallback)
       logos: __FFS_LOGOS__,         // server-injected: emblems in viewer/logo-candidates/ (sorted)
+      themes: __FFS_THEMES__,       // server-injected: viewer/themes/*.json (sorted; 00-default first)
       site: "FreedomFromSNS",
       models: ["gemini-2.5-flash", "gemini-3.1-pro-preview"],
       defaultModel: "gemini-2.5-flash"
     };
+  </script>
+  <script>
+    // Apply the persisted theme BEFORE first paint (no flash). The full theme
+    // logic (switcher, reset-then-apply) lives in fb-app.js; this is just the
+    // pre-paint primer for whatever theme the user last chose.
+    (function () {
+      try {
+        var T = (window.FFS.themes || []);
+        var i = parseInt(localStorage.getItem("ffs.theme"), 10) || 0;
+        var t = T[((i % T.length) + T.length) % (T.length || 1)];
+        if (t && t.tokens) { var r = document.documentElement; for (var k in t.tokens) r.style.setProperty("--" + k, t.tokens[k]); }
+      } catch (e) { /* CSS :root defaults remain */ }
+    })();
   </script>
 </head>
 <body>

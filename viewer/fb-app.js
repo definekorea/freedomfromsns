@@ -22,6 +22,7 @@
       type_photo: "사진", type_video: "영상", type_link: "링크", type_status: "글", type_share: "공유", type_uncat: "미분류", type_trash: "휴지통",
       sel_start: "선택", sel_done: "완료", sel_all: "전체 선택", sel_none: "선택 해제", sel_count: "개 선택됨", sel_erase: "삭제", sel_restore: "복원",
       show_hidden: "숨김 보기", show_hidden_hint: "삭제(숨김) 처리한 글을 함께 보여줍니다 — 데이터는 지워지지 않고 태그만 붙습니다",
+      theme: "테마",
       mon: "일월화수목금토", months: "1월 2월 3월 4월 5월 6월 7월 8월 9월 10월 11월 12월",
       related_searching: "  ·  관련 글 찾는 중…", semantic: "  ·  의미 검색",
       searching: "검색 중…", no_results: "결과가 없습니다.", no_results2: "결과 없음",
@@ -47,6 +48,7 @@
       type_photo: "Photos", type_video: "Videos", type_link: "Links", type_status: "Text", type_share: "Shares", type_uncat: "Unsorted", type_trash: "Trash",
       sel_start: "Select", sel_done: "Done", sel_all: "Select all", sel_none: "Clear", sel_count: " selected", sel_erase: "Erase", sel_restore: "Restore",
       show_hidden: "Show hidden", show_hidden_hint: "Also show erased (hidden) posts — nothing is deleted, just tagged",
+      theme: "Theme",
       mon: "SMTWTFS", months: "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec",
       related_searching: "  ·  finding related…", semantic: "  ·  semantic",
       searching: "Searching…", no_results: "No results.", no_results2: "No results",
@@ -88,6 +90,7 @@
     ctx: null,                  // ordered post ids for detail prev/next (current context)
     selMode: false, sel: {}, selAnchor: null,   // multi-select: mode, {id:true}, range anchor
     logo: (function () { try { return parseInt(localStorage.getItem("ffs.logo"), 10) || 0; } catch (e) { return 0; } })(),
+    theme: (function () { try { return parseInt(localStorage.getItem("ffs.theme"), 10) || 0; } catch (e) { return 0; } })(),
     showErased: (function () { try { return localStorage.getItem("ffs.showErased") === "1"; } catch (e) { return false; } })(),
     scroll: (function () { try { return JSON.parse(localStorage.getItem("ffs.scroll") || "{}") || {}; } catch (e) { return {}; } })(),
     _rendered: null,            // last view actually rendered (for enter-restore)
@@ -100,6 +103,24 @@
   /* ── boot ───────────────────────────────────────────────────────────── */
   function el(t, c, txt) { var e = document.createElement(t); if (c) e.className = c; if (txt != null) e.textContent = txt; return e; }
   function fmtDate(d) { return d ? d.slice(0, 10) : ""; }
+
+  /* ── theme system: a theme is a token set (viewer/themes/*.json) applied as
+     :root custom properties. The whole stylesheet flows from those tokens, so
+     one file repaints everything. Reset-then-apply lets a theme be partial
+     (only the tokens it overrides; the rest fall back to the CSS :root). ───── */
+  function THEMES() { return (CFG.themes && CFG.themes.length) ? CFG.themes : [{ name: "Gold Noir", tokens: {} }]; }
+  function applyTheme(tokens) {
+    var st = document.documentElement.style;
+    for (var i = st.length - 1; i >= 0; i--) { var p = st[i]; if (p.indexOf("--") === 0) st.removeProperty(p); }
+    if (tokens) for (var k in tokens) st.setProperty(k.charAt(0) === "-" ? k : "--" + k, tokens[k]);
+  }
+  function setTheme(i) {
+    var t = THEMES();
+    S.theme = ((i % t.length) + t.length) % t.length;
+    try { localStorage.setItem("ffs.theme", String(S.theme)); } catch (e) {}
+    applyTheme(t[S.theme].tokens);
+    if (els.themeBtn) els.themeBtn.title = tr("theme") + ": " + t[S.theme].name;
+  }
   // Brand wordmark: FreedomFromSNS with the F · F · S (Freedom · From · SNS)
   // picked out as accents — the "FFS" reads out of the full name.
   function brandWordmark() {
@@ -215,6 +236,12 @@
       els.filters.appendChild(selBtn);
     }
     if (S.view !== "chat") { els.count = el("div", "fb-count"); els.filters.appendChild(els.count); }
+    // theme cycler — instant repaint via :root tokens (a swatch of the accent)
+    var themeBtn = el("button", "fb-theme"); els.themeBtn = themeBtn;
+    themeBtn.title = tr("theme") + ": " + THEMES()[S.theme % THEMES().length].name;
+    themeBtn.innerHTML = '🎨';
+    themeBtn.onclick = function () { setTheme(S.theme + 1); };
+    els.filters.appendChild(themeBtn);
     var lang = el("button", "fb-lang", EN() ? "🇰🇷 한국어" : "🇺🇸 English");
     lang.title = EN() ? "한국어로 전환" : "Switch to English";
     lang.onclick = function () { setLang(EN() ? "ko" : "en"); };

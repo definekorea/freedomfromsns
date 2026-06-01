@@ -61,6 +61,20 @@ def create_app(spaces_root: Path, export_root: Path,
                 if f.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp", ".svg"):
                     logos.append(f"/static/logo-candidates/{f.name}?v={int(f.stat().st_mtime)}")
         html = html.replace("__FFS_LOGOS__", json.dumps(logos))
+        # Themes are auto-discovered from viewer/themes/*.json (sorted by name;
+        # 00-default is first). Each is {name, tokens}; the frontend applies a
+        # theme's tokens as :root custom properties. Drop a json there → new theme.
+        themes = []
+        theme_dir = _VIEWER / "themes"
+        if theme_dir.is_dir():
+            for f in sorted(theme_dir.glob("*.json")):
+                try:
+                    t = json.loads(f.read_text("utf-8"))
+                except Exception:
+                    continue
+                if isinstance(t, dict) and isinstance(t.get("tokens"), dict):
+                    themes.append({"name": t.get("name") or f.stem, "tokens": t["tokens"]})
+        html = html.replace("__FFS_THEMES__", json.dumps(themes))
         return html
 
     app.mount("/static", StaticFiles(directory=_VIEWER), name="static")
