@@ -23,7 +23,6 @@
     semanticLoading: false, searchToken: 0,
     model: (function () { try { return localStorage.getItem("ffs.model") || (CFG.defaultModel || "gemini-2.5-flash"); } catch (e) { return CFG.defaultModel || "gemini-2.5-flash"; } })(),
     agent: (function () { try { var v = localStorage.getItem("ffs.agent"); return v === null ? true : v === "1"; } catch (e) { return true; } })(),
-    hideEmpty: (function () { try { var v = localStorage.getItem("ffs.hideEmpty"); return v === null ? true : v === "1"; } catch (e) { return true; } })(),
   };
   var els = {};
 
@@ -82,11 +81,16 @@
   function renderFilters() {
     els.filters.innerHTML = "";
     if (S.view !== "browse") return;
-    ["all", "photo", "video", "link", "share", "status", "uncat"].forEach(function (t) {
-      var c = el("button", "fb-chip" + (S.type === t ? " on" : ""), t === "all" ? "전체" : TYPE[t]);
+    // Two groups: shown-by-default content, then a divider, then "click-into"
+    // buckets (링크/공유/미분류) that are hidden from 전체 — you open them on demand.
+    function chip(t, sec) {
+      var c = el("button", "fb-chip" + (sec ? " sec" : "") + (S.type === t ? " on" : ""), t === "all" ? "전체" : TYPE[t]);
       c.dataset.t = t; c.onclick = function () { S.type = t; S.shown = PAGE; renderBrowse(); };
-      els.filters.appendChild(c);
-    });
+      return c;
+    }
+    ["all", "photo", "video", "status"].forEach(function (t) { els.filters.appendChild(chip(t, false)); });
+    els.filters.appendChild(el("div", "fb-chip-div"));
+    ["link", "share", "uncat"].forEach(function (t) { els.filters.appendChild(chip(t, true)); });
     els.filters.appendChild(el("div", "fb-sp"));
     var yrs = uniqueYears();
     var sel = el("select", "fb-year");
@@ -94,12 +98,6 @@
     yrs.forEach(function (y) { sel.appendChild(new Option(y + "년", y)); });
     sel.value = S.year; sel.onchange = function () { S.year = sel.value; S.shown = PAGE; renderBrowse(); };
     els.filters.appendChild(sel);
-    // hide "meaningless" posts (empty / reshares missing the original with no link) — on by default
-    var tg = el("label", "fb-hide-empty" + (S.hideEmpty ? " on" : ""));
-    var cb = el("input"); cb.type = "checkbox"; cb.checked = S.hideEmpty;
-    cb.onchange = function () { S.hideEmpty = cb.checked; try { localStorage.setItem("ffs.hideEmpty", cb.checked ? "1" : "0"); } catch (e) {} S.shown = PAGE; tg.classList.toggle("on", cb.checked); renderCurrentView(); };
-    tg.appendChild(cb); tg.appendChild(el("span", null, "빈 글·원본 없는 공유 숨기기"));
-    els.filters.appendChild(tg);
     els.count = el("div", "fb-count"); els.filters.appendChild(els.count);
   }
 
@@ -189,17 +187,15 @@
     var q = S.q.toLowerCase();
     return S.posts.filter(function (p) { return !q || (p.title + " " + (p.excerpt || "")).toLowerCase().indexOf(q) >= 0; });
   }
-  // 전체 = the post timeline only; loose media (미분류) is its own bucket.
-  function passType(p) { return S.type === "all" ? p.type !== "uncat" : p.type === S.type; }
+  var BUCKETS = { link: 1, share: 1, uncat: 1 };  // click-into; hidden from 전체
+  function passType(p) {
+    if (S.type === "all") return !BUCKETS[p.type] && !p.empty;   // default feed: real content only
+    if (BUCKETS[S.type]) return p.type === S.type;               // a bucket shows its whole type
+    return p.type === S.type && !p.empty;                        // 사진/영상/글: hide empties too
+  }
   function passYear(p) { return S.year === "all" || p.date.slice(0, 4) === S.year; }
-  // the view's full set (ignores the hide toggle) — the denominator for the count.
-  function scoped() { return baseList().filter(function (p) { return passType(p) && passYear(p); }); }
   function filtered() {
-    return scoped().filter(function (p) {
-      // hide meaningless posts (empty / reshares missing the original, no link) —
-      // never hides 미분류 images (they're never flagged meaningless).
-      return !(S.hideEmpty && p.meaningless);
-    });
+    return baseList().filter(function (p) { return passType(p) && passYear(p); });
   }
 
   function card(p) {
@@ -214,10 +210,27 @@
     c.appendChild(thumb);
     var body = el("div", "fb-body");
     body.appendChild(el("div", "fb-date", fmtDate(p.date)));
-    body.appendChild(el("div", "fb-title", p.title || "(무제)"));
-    if (p.excerpt) body.appendChild(el("div", "fb-ex", p.excerpt));
+    var titleEl = el("div", "fb-title", p.title || "(무제)"); body.appendChild(titleEl);
+    var exEl = p.excerpt ? el("div", "fb-ex", p.excerpt) : null; if (exEl) body.appendChild(exEl);
     c.appendChild(body);
+    // link cards show the ACTUAL link preview (image + title/site) instead of a 🔗
+    if (p.type === "link" && p.link_url && !p.thumb) enrichLinkCard(p, thumb, titleEl, body, exEl);
     return c;
+  }
+  function enrichLinkCard(p, thumb, titleEl, body, exEl) {
+    unfurl(p.link_url).then(function (d) {
+      if (!d || !d.ok) return;
+      if (d.image) {
+        thumb.classList.remove("ph"); thumb.removeAttribute("data-ic");
+        var im = el("img"); im.loading = "lazy"; im.src = d.image;
+        im.onerror = function () { im.remove(); thumb.classList.add("ph"); thumb.dataset.ic = "🔗"; };
+        thumb.appendChild(im);
+      }
+      // if the post has no real comment (just "shared a link" or a bare URL), show the preview's title/site
+      var generic = !p.title || /shared a (link|post|memory)/i.test(p.title) || /^https?:\/\//.test(p.title);
+      if (d.title && generic) titleEl.textContent = decodeEnt(d.title);
+      if (d.site) { if (!exEl) { exEl = el("div", "fb-ex", ""); body.appendChild(exEl); } exEl.textContent = decodeEnt(d.site); }
+    });
   }
 
   function renderBrowse() {
@@ -225,10 +238,8 @@
     els.main.innerHTML = "";
     var list = filtered();
     if (els.count) {
-      // displayed / total — total is the view's full set (before the hide toggle).
-      var total = scoped().length;
       var note = S.semanticLoading ? "  ·  관련 글 찾는 중…" : (S.semanticIds && S.q ? "  ·  의미 검색" : "");
-      els.count.textContent = list.length.toLocaleString() + " / " + total.toLocaleString() + note;
+      els.count.textContent = list.length.toLocaleString() + "개" + note;
     }
     if (!list.length) {
       els.main.appendChild(el("div", "fb-empty", S.semanticLoading ? "검색 중…" : "결과가 없습니다."));

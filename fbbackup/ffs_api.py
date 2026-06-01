@@ -217,14 +217,12 @@ def register(app: FastAPI, b) -> None:
             ptype = str(p.get("type") or "status")
             out.append({"id": r["id"], "date": date, "title": r["title"],
                         "type": ptype,
-                        "excerpt": r["summary"], "thumb": thumb, "url": "", "vid": vid,
-                        # "meaningless" (hidden by default): empty posts (no media,
-                        # no link, title==text) OR any reshare ("share") — Facebook
-                        # strips the reshared original and the only link we could
-                        # synthesize (facebook.com/<fbid>) doesn't resolve, so a
-                        # bare reshare is meaningless. Reshares that DID keep a real
-                        # original link are type "link", not "share", and stay.
-                        "meaningless": bool(r.get("empty")) or ptype == "share"})
+                        "excerpt": r["summary"], "thumb": thumb, "vid": vid,
+                        "link_url": str(p.get("link_url") or ""),
+                        # "empty": no media, no link, no real text (title==text) —
+                        # nothing to show, hidden from every view. (Reshares are NOT
+                        # empty-by-fiat anymore — they live in the 공유 bucket.)
+                        "empty": bool(r.get("empty"))})
         out.sort(key=lambda r: r["date"], reverse=True)  # newest first
         return JSONResponse(out)
 

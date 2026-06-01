@@ -78,6 +78,8 @@ def post_to_row(post: dict, source: str = "facebook-export") -> tuple[str, str]:
         props["image_path"] = images[0]["abs_path"]  # gallery thumbnail
     if videos:
         props["video_path"] = videos[0]["abs_path"]  # poster-frame thumbnail (ffmpeg)
+    if post["links"]:
+        props["link_url"] = post["links"][0]["url"]  # for the link-card unfurl preview
 
     # Body
     lines = [f"# {props['title']}", ""]

@@ -298,13 +298,16 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
 .fb-doc-vid { width: 100%; max-height: 70vh; border-radius: 10px; margin: .6rem 0; background: #000; }
 .fb-badge.uncat { background: #2a2a30; color: #9a9aa2; }
 
-/* hide-empty toggle in the filter bar */
-.fb-hide-empty { display: inline-flex; align-items: center; gap: .35rem; font-size: .8rem; color: #8a8a90; cursor: pointer; user-select: none; padding: .2rem .4rem; border-radius: 6px; }
-.fb-hide-empty.on { color: #6ee7b7; }
-.fb-hide-empty input { cursor: pointer; accent-color: #2f6f54; }
 
 /* lightbox position scrubber — jump anywhere across thousands of items */
 .fb-lb-range { flex: 0 0 auto; width: min(70%, 720px); align-self: center; margin: .1rem auto .3rem; height: 4px; accent-color: #f5c451; cursor: pointer; }
 
 /* play overlay on video card thumbnails */
 .fb-thumb-play { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); width: 2.6rem; height: 2.6rem; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.55); color: #fff; border-radius: 50%; font-size: 1rem; padding-left: 3px; pointer-events: none; }
+
+/* filter groups: shown-by-default chips, a divider, then the "click-into" group
+   (링크/공유/미분류) in a dimmer, distinct tint so it reads as hidden-by-default */
+.fb-chip-div { width: 1px; align-self: stretch; margin: .2rem .5rem; background: #34343a; flex: 0 0 auto; }
+.fb-chip.sec { color: #8a8a90; border-color: #34343a; background: #161619; }
+.fb-chip.sec:hover { color: #b9a8e0; }
+.fb-chip.sec.on { background: #2a2340; color: #c9b8f0; border-color: #4a3f72; }
