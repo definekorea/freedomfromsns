@@ -57,7 +57,10 @@
       pub_copy: "복사", pub_copied: "복사됨 ✓",
       pub_need_cf: "cloudflared를 자동으로 받지 못했습니다. 직접 설치:",
       pub_cf_note: "처음 한 번 cloudflared(약 35MB)를 자동으로 내려받습니다.",
-      pub_note: "이 컴퓨터와 앱이 켜져 있는 동안만 작동하는 임시 주소이며, 재시작하면 바뀝니다. 내 도메인의 고정 주소를 원하면 터미널에서 `ffs tunnel` 실행(무료 Cloudflare 계정 + 도메인 필요).",
+      pub_session_note: "참고: 이 주소는 지금 세션 동안만 작동해요. 앱을 끄거나 재시작하면 사라지고, 다음에 켜면 새 주소가 만들어집니다.",
+      pub_perm_title: "고정 주소를 원하세요?",
+      pub_perm_desc: "무료 Cloudflare 계정 + 본인 도메인이 있으면 내 도메인의 **고정 주소**를 만들 수 있어요(재시작해도 그대로). 가입은 브라우저에 로그인된 **Google(Gmail)** 계정으로 한 번에 됩니다. 가입·도메인 연결 후 터미널에서 `ffs tunnel`을 실행하세요.",
+      pub_perm_btn: "Cloudflare 무료 가입 (Google 가능) ↗",
       embed_pill_building: "스마트 검색 만드는 중… {pct}%", embed_pill_ready: "✓ 스마트 검색 준비 완료",
     },
     en: {
@@ -101,7 +104,10 @@
       pub_copy: "Copy", pub_copied: "Copied ✓",
       pub_need_cf: "Couldn't download cloudflared automatically. Install it:",
       pub_cf_note: "First time, this downloads cloudflared (~35 MB) automatically.",
-      pub_note: "A temporary link that works only while this computer and app are running, and changes on restart. For a stable address on your own domain, run `ffs tunnel` in a terminal (needs a free Cloudflare account + a domain).",
+      pub_session_note: "Note: this address only works during this session. It disappears when the app stops or restarts, and a new one is generated next time.",
+      pub_perm_title: "Want a permanent address?",
+      pub_perm_desc: "With a free Cloudflare account + your own domain you get a **stable address** on your domain (survives restarts). You can sign up in one click with the **Google (Gmail)** account already logged into your browser. After signing up and adding a domain, run `ffs tunnel` in a terminal.",
+      pub_perm_btn: "Sign up free at Cloudflare (Google OK) ↗",
       embed_pill_building: "Building smart search… {pct}%", embed_pill_ready: "✓ Smart search ready",
     },
   };
@@ -346,7 +352,7 @@
     card.appendChild(el("h2", "fb-pub-h", tr("pub_title")));
     card.appendChild(warn);
     card.appendChild(els.pubBody);
-    card.appendChild(el("div", "fb-pub-note", tr("pub_note")));
+    card.appendChild(pubPermSection());
     els.pub.appendChild(card);
     els.pub.addEventListener("click", function (e) { if (e.target === els.pub) closePublish(); });
     document.body.appendChild(els.pub);
@@ -405,10 +411,24 @@
     var copy = el("button", "fb-pub-btn", tr("pub_copy"));
     copy.onclick = function () { try { navigator.clipboard.writeText(url); copy.textContent = tr("pub_copied"); } catch (e) {} };
     row.appendChild(a); row.appendChild(copy);
+    els.pubBody.appendChild(el("div", "fb-pub-note", tr("pub_session_note")));   // session-only caveat
     els.pubBody.appendChild(row);
     var stop = el("button", "fb-pub-btn danger", tr("pub_stop"));
     stop.onclick = function () { stop.disabled = true; fetch("/api/publish/stop", { method: "POST" }).then(function () { renderPublishBody(); }); };
     els.pubBody.appendChild(stop);
+  }
+  function _mdInline(t) {
+    return t.replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  }
+  function pubPermSection() {
+    var s = el("div", "fb-pub-perm");
+    s.appendChild(el("div", "fb-pub-perm-h", "🔗 " + tr("pub_perm_title")));
+    var d = el("div", "fb-pub-perm-desc"); d.innerHTML = _mdInline(tr("pub_perm_desc"));
+    s.appendChild(d);
+    var a = el("a", "fb-pub-btn", tr("pub_perm_btn"));
+    a.href = "https://dash.cloudflare.com/sign-up"; a.target = "_blank"; a.rel = "noopener";
+    s.appendChild(a);
+    return s;
   }
 
   /* ── smart-search progress pill (background embedding from the setup wizard) ──

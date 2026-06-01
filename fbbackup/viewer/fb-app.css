@@ -394,7 +394,11 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
 .fb-pub-urlrow { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
 .fb-pub-url { flex: 1; min-width: 12rem; word-break: break-all; color: var(--gold); font-weight: 600; }
 .fb-pub-need { color: var(--muted); font-size: .9rem; line-height: 1.5; }
-.fb-pub-note { color: var(--faint); font-size: .8rem; line-height: 1.5; margin-top: 1.1rem; }
+.fb-pub-note { color: var(--faint); font-size: .8rem; line-height: 1.5; margin-top: .2rem; }
+.fb-pub-perm { margin-top: 1.2rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+.fb-pub-perm-h { font-weight: 700; color: var(--txt); margin-bottom: .35rem; }
+.fb-pub-perm-desc { color: var(--muted); font-size: .85rem; line-height: 1.55; margin-bottom: .7rem; }
+.fb-pub-perm-desc code { background: var(--bg3); padding: .05rem .3rem; border-radius: 4px; font-size: .9em; }
 
 /* smart-search build pill (background embedding) */
 .fb-embed-pill { position: fixed; left: 1rem; bottom: 1rem; z-index: 55; max-width: 80vw; padding: .5rem .85rem; border-radius: 999px; background: var(--bg2); color: var(--txt); border: 1px solid var(--line); box-shadow: 0 6px 24px rgba(var(--shadow-rgb),.32); font-size: .85rem; opacity: 0; transform: translateY(8px); pointer-events: none; transition: opacity .25s, transform .25s; }
