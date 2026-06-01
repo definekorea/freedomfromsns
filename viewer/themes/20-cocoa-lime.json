@@ -1,0 +1,15 @@
+{
+  "name": "Cocoa Lime",
+  "tokens": {
+    "bg": "#14110b",
+    "bg-rgb": "20,17,11",
+    "bg2": "#1c1811",
+    "bg3": "#262018",
+    "line": "#312a1f",
+    "gold": "#c2d166",
+    "gold-rgb": "194,209,102",
+    "accent": "#d6e288",
+    "on-accent": "#16170a",
+    "brand-fg": "#e8e6d6"
+  }
+}

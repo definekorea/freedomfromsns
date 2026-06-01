@@ -1,0 +1,31 @@
+{
+  "name": "Electric Violet",
+  "tokens": {
+    "bg": "#ffffff",
+    "bg-rgb": "255,255,255",
+    "bg2": "#ffffff",
+    "bg3": "#f5f5f7",
+    "line": "#e0e0e6",
+    "line2": "#cfcfd8",
+    "sunken": "#f0f0f4",
+    "shadow-rgb": "0,0,0",
+    "hi-rgb": "0,0,0",
+    "txt": "#1d2228",
+    "fg": "#1d2228",
+    "fg-bright": "#000000",
+    "dim": "#5b636a",
+    "faint": "#8a9197",
+    "gold": "#6001d2",
+    "gold-rgb": "96,1,210",
+    "accent": "#5001b5",
+    "on-accent": "#ffffff",
+    "brand-fg": "#1d2228",
+    "brand-fg-2": "#5b636a",
+    "red": "#e0115f",
+    "red-rgb": "224,17,95",
+    "blue": "#0f69ff",
+    "blue-rgb": "15,105,255",
+    "green": "#1ac567",
+    "green-rgb": "26,197,103"
+  }
+}

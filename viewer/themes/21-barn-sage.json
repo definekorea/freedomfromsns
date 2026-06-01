@@ -1,0 +1,17 @@
+{
+  "name": "Barn Sage",
+  "tokens": {
+    "bg": "#12110e",
+    "bg-rgb": "18,17,14",
+    "bg2": "#1a1815",
+    "bg3": "#24221d",
+    "line": "#2f2c25",
+    "gold": "#9aad8a",
+    "gold-rgb": "154,173,138",
+    "accent": "#b6c6a8",
+    "on-accent": "#121710",
+    "brand-fg": "#e4e6dc",
+    "red": "#a83a32",
+    "red-rgb": "168,58,50"
+  }
+}

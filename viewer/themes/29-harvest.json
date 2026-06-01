@@ -1,0 +1,17 @@
+{
+  "name": "Harvest",
+  "tokens": {
+    "bg": "#131008",
+    "bg-rgb": "19,16,8",
+    "bg2": "#1b160c",
+    "bg3": "#261f12",
+    "line": "#312818",
+    "gold": "#ef8b2e",
+    "gold-rgb": "239,139,46",
+    "accent": "#f6a957",
+    "on-accent": "#1a0e02",
+    "brand-fg": "#ece2d2",
+    "green": "#8a9a3f",
+    "green-rgb": "138,154,63"
+  }
+}

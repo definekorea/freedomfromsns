@@ -1,0 +1,15 @@
+{
+  "name": "Dusty Indigo",
+  "tokens": {
+    "bg": "#0e1018",
+    "bg-rgb": "14,16,24",
+    "bg2": "#151824",
+    "bg3": "#1d2132",
+    "line": "#282d44",
+    "gold": "#7488c0",
+    "gold-rgb": "116,136,192",
+    "accent": "#9aabd6",
+    "on-accent": "#ffffff",
+    "brand-fg": "#dde0ee"
+  }
+}

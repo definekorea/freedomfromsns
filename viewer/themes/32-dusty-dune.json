@@ -1,0 +1,17 @@
+{
+  "name": "Dusty Dune",
+  "tokens": {
+    "bg": "#14130f",
+    "bg-rgb": "20,19,15",
+    "bg2": "#1b1914",
+    "bg3": "#25221b",
+    "line": "#302c23",
+    "gold": "#d2a463",
+    "gold-rgb": "210,164,99",
+    "accent": "#e2bd86",
+    "on-accent": "#1a1308",
+    "brand-fg": "#e6e0d2",
+    "blue": "#7d8aa8",
+    "blue-rgb": "125,138,168"
+  }
+}

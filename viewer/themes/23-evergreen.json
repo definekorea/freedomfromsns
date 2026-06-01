@@ -1,0 +1,15 @@
+{
+  "name": "Evergreen",
+  "tokens": {
+    "bg": "#0c130d",
+    "bg-rgb": "12,19,13",
+    "bg2": "#121b14",
+    "bg3": "#19261b",
+    "line": "#233626",
+    "gold": "#3f9e4a",
+    "gold-rgb": "63,158,74",
+    "accent": "#6abf72",
+    "on-accent": "#ffffff",
+    "brand-fg": "#dce8dd"
+  }
+}

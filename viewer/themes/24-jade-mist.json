@@ -1,0 +1,15 @@
+{
+  "name": "Jade Mist",
+  "tokens": {
+    "bg": "#0b1512",
+    "bg-rgb": "11,21,18",
+    "bg2": "#111e1a",
+    "bg3": "#182a25",
+    "line": "#223b34",
+    "gold": "#5fc99a",
+    "gold-rgb": "95,201,154",
+    "accent": "#88dcb6",
+    "on-accent": "#06140e",
+    "brand-fg": "#d8ece4"
+  }
+}

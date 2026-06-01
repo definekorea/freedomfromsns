@@ -1,0 +1,15 @@
+{
+  "name": "Burgundy Rose",
+  "tokens": {
+    "bg": "#170d12",
+    "bg-rgb": "23,13,18",
+    "bg2": "#1f1218",
+    "bg3": "#2a1923",
+    "line": "#36222e",
+    "gold": "#d05278",
+    "gold-rgb": "208,82,120",
+    "accent": "#e07e9c",
+    "on-accent": "#ffffff",
+    "brand-fg": "#ecdce2"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "Toffee",
+  "tokens": {
+    "bg": "#140e08",
+    "bg-rgb": "20,14,8",
+    "bg2": "#1c150d",
+    "bg3": "#271d12",
+    "line": "#322619",
+    "gold": "#b87a3e",
+    "gold-rgb": "184,122,62",
+    "accent": "#d49a64",
+    "on-accent": "#1a1008",
+    "brand-fg": "#e8ddcb"
+  }
+}

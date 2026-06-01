@@ -7,14 +7,25 @@ Pick a theme from the 🎨 menu in the filter bar (a swatch + name per theme;
 the choice persists). Add a theme by dropping a `.json` here — no code, no
 restart.
 
-**Shipped set (18):** `00-default` Gold Noir, then five major-site palettes
-(Google, Amazon, Facebook, YouTube, Yahoo), two from reference images
-(Mocha Mousse, Neon), and ten from Framer's *10 elegant palettes* (Earth Tones,
-Vibrant Greens, Warm Neutrals, Maroon Mood, Bold Orange, Cool Blues, Minimal,
-Pastels, Vibrant Blues, Power Purple). All are **dark interpretations** — each
-takes its palette's signature color as the accent and tunes the base/surfaces
-to that hue (so brand/image themes override `bg`/`bg2`/`bg3`/`line` too, not
-just the accent).
+**Shipped set (34):**
+- `00-default` **Gold Noir** (dark).
+- **5 light themes** (`01`–`05`) matching real current light UIs of major sites:
+  Primary Pop (Google), Amber Linen (Amazon), Sapphire Mist (Facebook),
+  Scarlet Paper (YouTube), Electric Violet (Yahoo). These are the **light**
+  themes — white/near-white surfaces, dark text, the site's accent.
+- 2 from reference images: Mocha Mousse, Neon.
+- 10 from Framer's *10 elegant palettes*: Earth Tones, Vibrant Greens, Warm
+  Neutrals, Maroon Mood, Bold Orange, Cool Blues, Minimal, Pastels, Vibrant
+  Blues, Power Purple.
+- 16 from a palette gallery: Morning Sky, Burgundy Rose, Cocoa Lime, Barn Sage,
+  Cerulean, Evergreen, Jade Mist, Toffee, Coral Reef, Dusty Indigo, Tropical
+  Punch, Harvest, Deep Ocean, Pop Art, Dusty Dune, Espresso.
+
+The dark themes are interpretations — each takes its palette's signature color
+as the accent and tunes the base/surfaces to that hue. A **light theme must be
+a full token set** (it inverts surfaces + text), and should flip `hi-rgb` to
+`0,0,0` so the faint overlays darken instead of lighten — see `01-primary-pop`
+for the template.
 
 ---
 
@@ -105,10 +116,18 @@ so tints and shadows — written `rgba(var(--x-rgb), a)` — re-tint with the th
 
 ---
 
-## Known limitation (light themes)
+## Light themes
 
-A handful of one-off neutral greys (e.g. `#333`, `#ddd`, subtle `#16161x`
-surfaces) are not yet tokenized — they read fine across **dark** themes but a
-true **light** theme would need them promoted to tokens too. The token layer is
-built to allow it (`shadow-rgb` / `hi-rgb` already exist for inverting
-shadows/overlays); finishing the greys is the remaining work for light mode.
+Light themes are fully supported. The stylesheet routes **every** surface, text,
+border and tint through tokens (`--sunken`/`--line2` cover the deep wells and
+strong borders; `--blue-rgb`/`--green-rgb` cover the semantic tints), so a light
+theme just needs to set light surfaces + dark text. The shipped `01`–`05` are
+light. When authoring one:
+
+- set `bg`/`bg2`/`bg3`/`sunken` light, `line`/`line2` to light greys;
+- set `txt`/`fg`/`dim`/`faint` dark, and **`fg-bright` to near-black** (it's the
+  strongest text, white only on dark themes);
+- set **`hi-rgb: 0,0,0`** so faint overlays (even-row tint, etc.) darken;
+- keep `shadow-rgb: 0,0,0` (shadows are dark on any background);
+- pick `on-accent` to read on the accent (white on saturated blue/red/purple,
+  near-black on a light/orange accent).

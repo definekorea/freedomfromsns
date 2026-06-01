@@ -1,0 +1,15 @@
+{
+  "name": "Deep Ocean",
+  "tokens": {
+    "bg": "#0a0e1a",
+    "bg-rgb": "10,14,26",
+    "bg2": "#0f1426",
+    "bg3": "#161d33",
+    "line": "#1f2a45",
+    "gold": "#2f8ca8",
+    "gold-rgb": "47,140,168",
+    "accent": "#5ab0cc",
+    "on-accent": "#ffffff",
+    "brand-fg": "#d6e2ee"
+  }
+}

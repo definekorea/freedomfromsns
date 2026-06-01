@@ -1,0 +1,31 @@
+{
+  "name": "Sapphire Mist",
+  "tokens": {
+    "bg": "#f0f2f5",
+    "bg-rgb": "240,242,245",
+    "bg2": "#ffffff",
+    "bg3": "#f0f2f5",
+    "line": "#ced0d4",
+    "line2": "#bcc0c4",
+    "sunken": "#e4e6eb",
+    "shadow-rgb": "0,0,0",
+    "hi-rgb": "0,0,0",
+    "txt": "#050505",
+    "fg": "#050505",
+    "fg-bright": "#000000",
+    "dim": "#65676b",
+    "faint": "#8a8d91",
+    "gold": "#1877f2",
+    "gold-rgb": "24,119,242",
+    "accent": "#166fe5",
+    "on-accent": "#ffffff",
+    "brand-fg": "#050505",
+    "brand-fg-2": "#65676b",
+    "red": "#fa383e",
+    "red-rgb": "250,56,62",
+    "blue": "#1877f2",
+    "blue-rgb": "24,119,242",
+    "green": "#31a24c",
+    "green-rgb": "49,162,76"
+  }
+}

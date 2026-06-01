@@ -1,0 +1,31 @@
+{
+  "name": "Scarlet Paper",
+  "tokens": {
+    "bg": "#ffffff",
+    "bg-rgb": "255,255,255",
+    "bg2": "#ffffff",
+    "bg3": "#f9f9f9",
+    "line": "#e5e5e5",
+    "line2": "#d3d3d3",
+    "sunken": "#f2f2f2",
+    "shadow-rgb": "0,0,0",
+    "hi-rgb": "0,0,0",
+    "txt": "#0f0f0f",
+    "fg": "#0f0f0f",
+    "fg-bright": "#000000",
+    "dim": "#606060",
+    "faint": "#909090",
+    "gold": "#ff0000",
+    "gold-rgb": "255,0,0",
+    "accent": "#cc0000",
+    "on-accent": "#ffffff",
+    "brand-fg": "#0f0f0f",
+    "brand-fg-2": "#606060",
+    "red": "#ff0000",
+    "red-rgb": "255,0,0",
+    "blue": "#065fd4",
+    "blue-rgb": "6,95,212",
+    "green": "#2ba640",
+    "green-rgb": "43,166,64"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "Coral Reef",
+  "tokens": {
+    "bg": "#0a1413",
+    "bg-rgb": "10,20,19",
+    "bg2": "#101c1a",
+    "bg3": "#172825",
+    "line": "#213a36",
+    "gold": "#4ec9c0",
+    "gold-rgb": "78,201,192",
+    "accent": "#7eddd6",
+    "on-accent": "#04140f",
+    "brand-fg": "#d8ece8",
+    "red": "#ef8068",
+    "red-rgb": "239,128,104"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "Pop Art",
+  "tokens": {
+    "bg": "#0e0c12",
+    "bg-rgb": "14,12,18",
+    "bg2": "#16121c",
+    "bg3": "#1f1928",
+    "line": "#2a2236",
+    "gold": "#f23bd4",
+    "gold-rgb": "242,59,212",
+    "accent": "#f86fe0",
+    "on-accent": "#ffffff",
+    "brand-fg": "#f0e2ee"
+  }
+}

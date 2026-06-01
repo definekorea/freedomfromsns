@@ -1,0 +1,15 @@
+{
+  "name": "Cerulean",
+  "tokens": {
+    "bg": "#0a0f16",
+    "bg-rgb": "10,15,22",
+    "bg2": "#101824",
+    "bg3": "#16202e",
+    "line": "#20303f",
+    "gold": "#2196f3",
+    "gold-rgb": "33,150,243",
+    "accent": "#5ab0f7",
+    "on-accent": "#ffffff",
+    "brand-fg": "#d8e6f5"
+  }
+}

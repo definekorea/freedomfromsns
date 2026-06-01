@@ -1,0 +1,31 @@
+{
+  "name": "Primary Pop",
+  "tokens": {
+    "bg": "#ffffff",
+    "bg-rgb": "255,255,255",
+    "bg2": "#ffffff",
+    "bg3": "#f1f3f4",
+    "line": "#dadce0",
+    "line2": "#c6c9cc",
+    "sunken": "#f1f3f4",
+    "shadow-rgb": "0,0,0",
+    "hi-rgb": "0,0,0",
+    "txt": "#202124",
+    "fg": "#202124",
+    "fg-bright": "#000000",
+    "dim": "#5f6368",
+    "faint": "#80868b",
+    "gold": "#1a73e8",
+    "gold-rgb": "26,115,232",
+    "accent": "#1967d2",
+    "on-accent": "#ffffff",
+    "brand-fg": "#5f6368",
+    "brand-fg-2": "#80868b",
+    "red": "#ea4335",
+    "red-rgb": "234,67,53",
+    "blue": "#1a73e8",
+    "blue-rgb": "26,115,232",
+    "green": "#34a853",
+    "green-rgb": "52,168,83"
+  }
+}

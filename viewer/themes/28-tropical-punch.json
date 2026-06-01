@@ -1,0 +1,17 @@
+{
+  "name": "Tropical Punch",
+  "tokens": {
+    "bg": "#0d130f",
+    "bg-rgb": "13,19,15",
+    "bg2": "#131c16",
+    "bg3": "#1b2820",
+    "line": "#26392e",
+    "gold": "#4fbf95",
+    "gold-rgb": "79,191,149",
+    "accent": "#79d6b2",
+    "on-accent": "#04140e",
+    "brand-fg": "#e2ece0",
+    "red": "#f76b88",
+    "red-rgb": "247,107,136"
+  }
+}

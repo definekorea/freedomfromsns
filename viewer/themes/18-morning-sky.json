@@ -1,0 +1,15 @@
+{
+  "name": "Morning Sky",
+  "tokens": {
+    "bg": "#0c1014",
+    "bg-rgb": "12,16,20",
+    "bg2": "#141a20",
+    "bg3": "#1c2530",
+    "line": "#283340",
+    "gold": "#7eb8e8",
+    "gold-rgb": "126,184,232",
+    "accent": "#a3cef0",
+    "on-accent": "#07111c",
+    "brand-fg": "#dde8f2"
+  }
+}

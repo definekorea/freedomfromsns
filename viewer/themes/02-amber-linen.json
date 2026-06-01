@@ -1,0 +1,31 @@
+{
+  "name": "Amber Linen",
+  "tokens": {
+    "bg": "#eaeded",
+    "bg-rgb": "234,237,237",
+    "bg2": "#ffffff",
+    "bg3": "#f7f8f8",
+    "line": "#d5d9d9",
+    "line2": "#c2c8c8",
+    "sunken": "#eef1f1",
+    "shadow-rgb": "0,0,0",
+    "hi-rgb": "0,0,0",
+    "txt": "#0f1111",
+    "fg": "#0f1111",
+    "fg-bright": "#000000",
+    "dim": "#565959",
+    "faint": "#848a8a",
+    "gold": "#ff9900",
+    "gold-rgb": "255,153,0",
+    "accent": "#e88a00",
+    "on-accent": "#0f1111",
+    "brand-fg": "#232f3e",
+    "brand-fg-2": "#565959",
+    "red": "#cc0c39",
+    "red-rgb": "204,12,57",
+    "blue": "#007185",
+    "blue-rgb": "0,113,133",
+    "green": "#007600",
+    "green-rgb": "0,118,0"
+  }
+}
