@@ -8,10 +8,11 @@
   "use strict";
   var CFG = window.FFS || {};
   var PAGE = 60;
-  // Brand logo cycles on click (the Browse tab handles Home): the typographic
-  // wordmark (null) then the generated emblems. Choice persists in localStorage.
-  var LOGOS = [null, "/static/logo-candidates/01-monogram.png",
-    "/static/logo-candidates/02-bird.png", "/static/logo-candidates/03-unplug.png"];
+  // Brand logo: index 0 is the typographic wordmark (null); the rest are emblems
+  // the server auto-discovers from viewer/logo-candidates/ (sorted; mtime-busted).
+  // Clicking the brand goes Home AND rotates to the next design (persisted).
+  var LOGOS = [null].concat((CFG.logos && CFG.logos.length) ? CFG.logos
+    : ["/static/logo-candidates/01-monogram.png", "/static/logo-candidates/02-bird.png", "/static/logo-candidates/03-unplug.png"]);
 
   /* ── i18n (KO / EN) ──────────────────────────────────────────────────── */
   var I18N = {
@@ -86,7 +87,7 @@
     semanticLoading: false, searchToken: 0,
     ctx: null,                  // ordered post ids for detail prev/next (current context)
     selMode: false, sel: {}, selAnchor: null,   // multi-select: mode, {id:true}, range anchor
-    logo: (function () { try { return (parseInt(localStorage.getItem("ffs.logo"), 10) || 0) % 4; } catch (e) { return 0; } })(),
+    logo: (function () { try { return parseInt(localStorage.getItem("ffs.logo"), 10) || 0; } catch (e) { return 0; } })(),
     showErased: (function () { try { return localStorage.getItem("ffs.showErased") === "1"; } catch (e) { return false; } })(),
     scroll: (function () { try { return JSON.parse(localStorage.getItem("ffs.scroll") || "{}") || {}; } catch (e) { return {}; } })(),
     _rendered: null,            // last view actually rendered (for enter-restore)
@@ -138,10 +139,11 @@
     var bar = el("div", "fb-bar");
     var brand = el("div", "fb-brand"); renderBrand(brand);
     brand.style.cursor = "pointer"; brand.title = "FreedomFromSNS";
-    brand.onclick = function () {   // cycle the logo design (Browse goes Home)
+    brand.onclick = function () {   // go Home AND rotate to the next logo design
       S.logo = (S.logo + 1) % LOGOS.length;
       try { localStorage.setItem("ffs.logo", String(S.logo)); } catch (e) {}
       renderBrand(brand);
+      goHome();
     };
 
     var tabs = el("div", "fb-tabs");

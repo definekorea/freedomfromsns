@@ -14,6 +14,7 @@
       chat: "/api/chat",            // POST {messages,model} → {answer,sources,media,model}
       object: "/api/fb/objects/",   // + id → post detail (markdown body)
       unfurl: "/api/fb/unfurl",     // ?url= → link preview (OG + Wayback fallback)
+      logos: __FFS_LOGOS__,         // server-injected: emblems in viewer/logo-candidates/ (sorted)
       site: "FreedomFromSNS",
       models: ["gemini-2.5-flash", "gemini-3.1-pro-preview"],
       defaultModel: "gemini-2.5-flash"

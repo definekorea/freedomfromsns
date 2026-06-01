@@ -7,6 +7,7 @@ single-page viewer at `/`. One process, one Gemini key, one port (8282).
 """
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
@@ -50,6 +51,16 @@ def create_app(spaces_root: Path, export_root: Path,
             except OSError:
                 v = 1
             html = html.replace(f"/static/{name}", f"/static/{name}?v={v}")
+        # Logo emblems are auto-discovered from viewer/logo-candidates/ (sorted by
+        # name → controllable order). Drop/replace a png there and it joins the
+        # brand's click-to-rotate set; mtime-busting picks up replacements.
+        logos = []
+        logo_dir = _VIEWER / "logo-candidates"
+        if logo_dir.is_dir():
+            for f in sorted(logo_dir.iterdir()):
+                if f.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp", ".svg"):
+                    logos.append(f"/static/logo-candidates/{f.name}?v={int(f.stat().st_mtime)}")
+        html = html.replace("__FFS_LOGOS__", json.dumps(logos))
         return html
 
     app.mount("/static", StaticFiles(directory=_VIEWER), name="static")
