@@ -1,0 +1,269 @@
+# FreedomFromSNS — Deployment & Publishing (design + research)
+
+How a **non-technical person** goes from *"I downloaded my Facebook data"* to
+*"I'm browsing it — and (optionally) it's online for friends"* on **Windows,
+macOS, or Linux**, with as few manual steps as possible. This is the plan that
+realizes the North Star ("the easy way for anyone… on every major OS, even with
+zero technical skill").
+
+Status: **design + research doc.** Some of it already exists in `fbbackup`
+(`ffs serve/share/export-static/publish/doctor`, `recommend_sharing()`, the
+optional `local`/`gpu` extras, graceful ffmpeg/embedding fallbacks); the rest is
+the roadmap. Each section marks ✅ done / 🔜 to build.
+
+---
+
+## 0. The ideal flow (what we're building toward)
+
+```
+download FB data ──► run one installer ──► wizard finds the data + connects an AI
+   ──► it processes (parse → build → embed) ──► a browser opens at localhost
+   ──► guided tour of browse / search / chat ──► (optional) "Publish online"
+   ──► public URL; if chat is exposed, it's throttled + topic-locked
+```
+
+One install command. One wizard. No hand-installing Python, ffmpeg, or a venv.
+
+---
+
+## 1. Dependency reality — what's hard, and the substitutes
+
+FFS is intentionally lean. Core is trivially portable; the only friction is three
+**system-level** things. The rule: **everything hard is optional and degrades
+gracefully, or has a pip-installable substitute.**
+
+| Dependency | Role | Difficulty | Substitute / strategy | Status |
+|---|---|---|---|---|
+| Python 3.11+ | runtime | medium (don't make users install it) | **`uv`** installs + pins a managed Python; users never touch system Python | 🔜 |
+| `fastapi` / `uvicorn` / `numpy` | the app | easy (pure wheels) | — | ✅ |
+| **ffmpeg** | video poster-frame thumbnails | hard (system binary) | already optional (`shutil.which` → graceful skip). Substitute: **`imageio-ffmpeg`** (pip, bundles a static ffmpeg per-OS ~60 MB, `get_ffmpeg_exe()`); fall back to it when system ffmpeg is absent | partly ✅ → 🔜 |
+| **fastembed / onnxruntime** | *local* offline embeddings | hard (large platform wheels) | already optional (`local` extra). Default = **Gemini embeddings** (a free key, no download). Only installed if the user picks "fully offline" | ✅ |
+| `onnxruntime-gpu` | GPU embeddings | very hard (~277 MB, CUDA) | `gpu` extra, opt-in only when a CUDA GPU is detected | ✅ |
+| **cloudflared** | publishing | easy-ish (single binary, no package mgr) | download the one binary for the OS on demand (the wizard/`ffs share` fetches it) | partly ✅ |
+
+**Net:** a default install needs only pure-Python wheels. ffmpeg → pip substitute.
+Local embeddings + GPU → opt-in. cloudflared → a single binary, only when publishing.
+
+### The `imageio-ffmpeg` substitution (🔜, small)
+
+`spaces_backend._video_thumb` already checks `shutil.which("ffmpeg")`. Add a
+resolver: prefer system ffmpeg, else `imageio_ffmpeg.get_ffmpeg_exe()` if the
+package is present, else skip (video cards show a ▶ placeholder — already
+handled). Add `imageio-ffmpeg` to a `media` extra so thumbnails "just work" on
+native Windows/macOS without a system ffmpeg install.
+
+---
+
+## 2. Install matrix — native first, WSL + Docker as alternates
+
+**Recommended everywhere: native via `uv`.** `uv` is one rust binary that
+installs Python, makes the venv, and resolves deps — on all three OSes — so the
+user never hand-installs Python or a venv.
+
+### 2a. Native (all OSes) — the one-liner + wizard  🔜
+
+A tiny bootstrap installs `uv`, then `uv tool install freedomfromsns` (or
+`uvx freedomfromsns setup`), then launches the wizard.
+
+- **Windows (native, no WSL):**
+  ```powershell
+  powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+  uv tool install freedomfromsns
+  ffs setup            # wizard: find data → connect AI → process → open browser
+  ```
+  A double-clickable `install-ffs.ps1` wraps this. ffmpeg via `imageio-ffmpeg`
+  (no system install). cloudflared.exe downloaded on demand. **No WSL, no Docker
+  required** — the North Star's "native Windows."
+- **macOS / Linux:**
+  ```bash
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  uv tool install freedomfromsns
+  ffs setup
+  ```
+  A one-line `install-ffs.sh` wraps it.
+
+### 2b. WSL (Windows power users)  ✅-ish
+
+Already works (this repo runs in WSL). For users who prefer Linux tooling or
+want an always-on box. The native path above is preferred for non-technical
+users (no WSL setup). Document WSL as "advanced/alternate."
+
+### 2c. Docker (always-on / servers)  🔜
+
+A `Dockerfile` (python-slim + uv + ffmpeg apt + the app) and a `docker compose`
+that mounts the FB export read-only and persists `index/` + `settings.json`.
+For people who want it running 24/7 on a NAS/VPS and publishing permanently.
+
+```yaml
+# docker-compose.yml (sketch)
+services:
+  ffs:
+    build: .
+    volumes:
+      - /path/to/facebook-export:/data/export:ro
+      - ./ffs-state:/data/state         # index/, settings.json, .env
+    environment: [ FBBACKUP_EXPORT_ROOT=/data/export, FBBACKUP_HOME=/data/state ]
+    ports: ["8282:8282"]
+```
+
+---
+
+## 3. Find the Facebook data automatically  🔜
+
+The wizard should **not** ask the user to type a path. The export unzips to
+`facebook-<name>-<date>-<hash>/` containing `your_facebook_activity/`.
+
+**Auto-locate algorithm** (`ffs setup` / a `locate_export()` helper):
+1. Candidate roots, per-OS:
+   - Windows: `%USERPROFILE%\Downloads`, `\Desktop`, `\Documents`; also other drives' roots.
+   - macOS/Linux: `~/Downloads`, `~/Desktop`, `~/Documents`.
+2. In each, look for: a folder matching `facebook-*` **or** any folder containing
+   `your_facebook_activity/posts/` (the load-bearing marker), **or** a
+   `facebook-*.zip` / `*your*information*.zip`.
+3. If a **.zip** is found, offer to unzip it (to `~/FreedomFromSNS/export/`).
+4. If several candidates, show the newest with its date and let the user confirm.
+5. Write the chosen path to `config.toml` `[export] root` (replacing the dev
+   default `/mnt/d/dev/facebook-data`).
+
+Cross-platform "Downloads" detection: `Path.home() / "Downloads"` covers the
+common case; on Windows also read the `Shell Folders` registry value as a
+fallback (localized/redirected Downloads).
+
+---
+
+## 4. The setup wizard (`ffs setup`)  🔜 (extends the existing `ffs doctor`)
+
+Jargon-free, steers by intent (never "Mode A/B", never "cascade tier"):
+
+1. **Find your data** — auto-locate (§3); confirm.
+2. **Connect an AI** — three plain choices:
+   - *Keep it free* → open the Gemini key page, paste the key (covers **chat**
+     *and* **embeddings**, no download). **Recommended.**
+   - *I'll pay per use* → DeepSeek / OpenAI / etc. (the Settings provider list).
+   - *Fully offline* → local fastembed embeddings (installs the `local` extra,
+     downloads the model once) + a local chat model (Ollama) or no chat.
+   > Embeddings need *some* provider; Gemini's free key is the zero-friction
+   > default (no model download). See `settings.md` / the in-app ⚙ Settings.
+3. **Process** — `parse → build → embed` with a progress bar; resumable.
+4. **Open** — start the server and open `http://127.0.0.1:8282` in the browser.
+5. **Tour** — a first-run overlay points at Browse / Search / the ✦ AI chat /
+   ⚙ Settings / and the **Publish** button.
+
+`ffs doctor` (✅ exists) stays as the "what's wrong / what's missing" check the
+wizard and support both lean on.
+
+---
+
+## 5. Publishing — going public with Cloudflare
+
+Three levels, from "show a friend in 10 seconds" to "permanent site." FFS
+already has `ffs share` (quick tunnel) and `ffs export-static` + `ffs publish`
+(static hosts) + `recommend_sharing()`.
+
+### Level 1 — Quick tunnel (instant, no account)  ✅ `ffs share`
+
+```bash
+ffs share          # cloudflared tunnel --url http://localhost:8282
+```
+Gives a random `https://<words>.trycloudflare.com` URL. **No login.** Caveats
+(from Cloudflare): the URL **changes every restart**, it's capped at **200
+in-flight requests**, and it's meant for testing, not production. Perfect for
+"look at this now"; not for a URL you hand out.
+
+### Level 2 — Permanent (free Cloudflare account + a domain)  🔜 the headline
+
+A **named tunnel** gives a **stable URL that survives restarts**, unmetered
+bandwidth, no open ports, no exposed IP — **free**. The one prerequisite:
+**a domain whose DNS is on Cloudflare** (free plan). 
+
+**Why make a permanent (free) Cloudflare account — the benefits:**
+- **A stable, memorable URL** on *your* domain (`archive.yourname.com`) instead
+  of a random string that dies on restart.
+- **It stays up** — the named tunnel auto-reconnects; reboot-safe.
+- **Free Zero-Trust Access** (up to 50 users): put a **login in front** of the
+  whole archive (email one-time-code or Google), or keep the archive public and
+  protect only an admin path. This is how you share with *specific* people.
+- **Protection for free:** Cloudflare's CDN/cache, DDoS shielding, and basic
+  analytics sit in front of your laptop; visitors never reach your IP.
+- **No router/firewall config** — nothing to port-forward.
+
+**Setup (the wizard will script this):**
+```bash
+cloudflared tunnel login                       # one browser login (the account)
+cloudflared tunnel create ffs                  # creates a persistent tunnel
+cloudflared tunnel route dns ffs archive.yourdomain.com
+# config.yml: ingress → http://localhost:8282
+cloudflared tunnel run ffs                      # (or install as a service)
+```
+Don't own a domain? Cheapest path: register one (a few $/yr) and add it to
+Cloudflare's free plan — that's the only non-free part, and it's optional (Level
+1 and Level 3 need no domain).
+
+### Level 3 — Static publish (permanent, machine-off, no live chat)  ✅ `ffs publish`
+
+```bash
+ffs export-static --out site
+ffs publish --target recommend          # picks github-pages / cloudflare-pages / …
+```
+A self-contained HTML/JS snapshot (browse + keyword search, **no AI**) on a free
+static host. Permanent, your computer can be off. The trade-off: no semantic
+search, no chat (those need the live server). `recommend_sharing()` already
+picks the best host by archive size. **Cloudflare Pages** is the natural match.
+
+> **Recommendation surfaced in-app:** the Publish button explains these three in
+> plain language — *Quick link (now, temporary)* · *Permanent site with chat
+> (free account + domain)* · *Permanent snapshot, no chat (free, always on)*.
+
+---
+
+## 6. Public AI chat — throttled + topic-locked  🔜
+
+If the user exposes the **live** server (Level 2) with chat on, the public must
+not be able to run up their AI bill or use it as a free general chatbot. A
+**"public mode"** the shared instance runs in (`FFS_PUBLIC=1`, or a Settings
+toggle written to `settings.json`):
+
+- **Topic-lock** — a public system prompt clamp: *answer only from this archive
+  and closely-related context; politely refuse anything off-topic.* (Prepended
+  in `_chat`/`agent_chat`'s system prompt when public.) Optional allowlist of
+  themes the owner sets.
+- **Throttle** — per-IP rate limit (e.g. *N messages / minute / IP* + a daily
+  cap), enforced in a middleware in front of `/api/chat`. A friendly "try again
+  in a minute" message, not a 500.
+- **Cost cap** — force the **fast** (cheap) lane, lower `maxOutputTokens`,
+  **disable the agentic tool lane** publicly (it makes many calls), and disable
+  expensive features. Optionally a global daily token budget that flips chat to
+  "busy" when hit.
+- **Read-only & private-safe** — public mode also hides erased/private posts
+  (already excluded from export) and disables Settings / management endpoints.
+
+Implementation hooks (small, all in `ffs_api`):
+1. `PUBLIC = os.environ.get("FFS_PUBLIC") == "1"` (or settings flag).
+2. `/api/chat`: if `PUBLIC` → ignore `agent`, force fast model, cap tokens,
+   prepend the topic-lock clamp, run the request through the rate-limiter.
+3. A tiny in-memory per-IP token bucket (no extra deps); the `taskqueue`-style
+   pattern from Weft is the reference if we want bounded concurrency too.
+4. Gate `/api/settings*`, `/api/privacy`, `/api/erase` behind "not public."
+
+---
+
+## 7. Build order (suggested)
+
+1. **`imageio-ffmpeg` fallback** + a `media` extra (frictionless video thumbs). (S)
+2. **`uv`-based installers** `install-ffs.{ps1,sh}` + `pyproject` console entry. (M)
+3. **`ffs setup` wizard** + **auto-locate** the FB export (§3–4). (M)
+4. **First-run browser tour** + the **Publish** button in the dashboard. (M)
+5. **Public mode** for the chat (throttle + topic-lock + cost cap) (§6). (M)
+6. **Named-tunnel helper** (`ffs publish --target cloudflare-tunnel`) that scripts
+   Level 2 + writes a `config.yml` + optional service install. (M)
+7. **Dockerfile + compose** for always-on. (S)
+
+---
+
+## Sources
+- uv (Astral): <https://docs.astral.sh/uv/getting-started/installation/>, scripts <https://docs.astral.sh/uv/guides/scripts/>
+- Cloudflare Tunnel — quick vs named, domain requirement, limits:
+  <https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/do-more-with-tunnels/trycloudflare/>,
+  <https://developers.cloudflare.com/cloudflare-one/faq/cloudflare-tunnels-faq/>
+- imageio-ffmpeg (bundled static ffmpeg): <https://github.com/imageio/imageio-ffmpeg>, <https://pypi.org/project/imageio-ffmpeg/>
+- Cloudflare Access (Zero Trust, free tier) for gating the public site.
