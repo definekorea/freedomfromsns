@@ -302,3 +302,9 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
 .fb-hide-empty { display: inline-flex; align-items: center; gap: .35rem; font-size: .8rem; color: #8a8a90; cursor: pointer; user-select: none; padding: .2rem .4rem; border-radius: 6px; }
 .fb-hide-empty.on { color: #6ee7b7; }
 .fb-hide-empty input { cursor: pointer; accent-color: #2f6f54; }
+
+/* lightbox position scrubber — jump anywhere across thousands of items */
+.fb-lb-range { flex: 0 0 auto; width: min(70%, 720px); align-self: center; margin: .1rem auto .3rem; height: 4px; accent-color: #f5c451; cursor: pointer; }
+
+/* play overlay on video card thumbnails */
+.fb-thumb-play { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); width: 2.6rem; height: 2.6rem; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.55); color: #fff; border-radius: 50%; font-size: 1rem; padding-left: 3px; pointer-events: none; }

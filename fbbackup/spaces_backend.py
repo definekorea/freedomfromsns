@@ -558,6 +558,39 @@ class SpacesBackend:
         except Exception:
             return None
 
+    def _video_thumb(self, abs_path: Path, w: int) -> Path | None:
+        """A poster frame for a local video — grab a frame a couple seconds in
+        (past black intros) via ffmpeg, scaled to width w, cached as WebP."""
+        import hashlib
+        import shutil
+        import subprocess
+        if not shutil.which("ffmpeg"):
+            return None
+        try:
+            st = abs_path.stat()
+            cache = self.root.parent / ".thumb-cache"
+            key = hashlib.sha256(f"v|{abs_path}|{w}|{int(st.st_mtime)}|{st.st_size}".encode()).hexdigest()
+            out = cache / f"{key}.webp"
+            if out.is_file():
+                return out
+            cache.mkdir(parents=True, exist_ok=True)
+            tmp = out.with_name(out.name + ".tmp.webp")
+            cmd = ["ffmpeg", "-y", "-loglevel", "error", "-ss", "2", "-i", str(abs_path),
+                   "-frames:v", "1", "-vf", f"scale={w}:-2", "-f", "webp", str(tmp)]
+            subprocess.run(cmd, timeout=25, check=True, capture_output=True)
+            if tmp.is_file() and tmp.stat().st_size > 0:
+                tmp.replace(out)
+                return out
+            # very short clip → the -ss 2 seek may overshoot; retry from the start
+            cmd[cmd.index("-ss") + 1] = "0"
+            subprocess.run(cmd, timeout=25, check=True, capture_output=True)
+            if tmp.is_file() and tmp.stat().st_size > 0:
+                tmp.replace(out)
+                return out
+        except Exception:  # noqa: BLE001 — corrupt/odd codec → just no poster
+            pass
+        return None
+
     def _unfurl(self, url: str) -> dict:
         """Open Graph preview (title/description/image/site) for a URL, with a
         Wayback Machine fallback for dead links (common across an 18-year
@@ -897,6 +930,23 @@ class SpacesBackend:
                 if thumb is not None:
                     return FileResponse(thumb, media_type="image/webp")
             return FileResponse(abs_path)
+
+        @r.get("/vthumb")
+        def video_thumb(path: str, w: int = 400):
+            try:
+                abs_path = Path(path).expanduser().resolve(strict=False)
+            except (OSError, RuntimeError):
+                raise HTTPException(400, "bad path")
+            if not b._serve_allowed(abs_path):
+                raise HTTPException(403, "path not allowlisted")
+            if abs_path.suffix.lower() not in _VID_EXTS:
+                raise HTTPException(403, "not a video")
+            if not abs_path.is_file():
+                raise HTTPException(404, "not found")
+            t = b._video_thumb(abs_path, max(80, min(800, w)))
+            if t is not None:
+                return FileResponse(t, media_type="image/webp")
+            raise HTTPException(404, "no thumbnail")
 
         @r.get("/unfurl")
         def unfurl(url: str):

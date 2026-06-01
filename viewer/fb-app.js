@@ -208,7 +208,7 @@
     // thumbnail strip, instead of a text-less detail modal.
     var c = el("div", "fb-card"); c.onclick = function () { if (p.type === "uncat") openUncatLightbox(p); else openPost(p.id); };
     var thumb;
-    if (p.thumb) { thumb = el("div", "fb-thumb"); var im = el("img"); im.loading = "lazy"; im.src = p.thumb; im.onerror = function () { thumb.classList.add("ph"); thumb.dataset.ic = "▦"; im.remove(); }; thumb.appendChild(im); }
+    if (p.thumb) { thumb = el("div", "fb-thumb"); var im = el("img"); im.loading = "lazy"; im.src = p.thumb; im.onerror = function () { thumb.classList.add("ph"); thumb.dataset.ic = p.vid ? "▶" : "▦"; im.remove(); }; thumb.appendChild(im); if (p.vid) thumb.appendChild(el("span", "fb-thumb-play", "▶")); }
     else { thumb = el("div", "fb-thumb ph"); thumb.dataset.ic = p.type === "video" || p.type === "uncat" ? "▶" : p.type === "link" ? "🔗" : p.type === "share" ? "↻" : "▦"; }
     var badge = el("div", "fb-badge " + p.type, TYPE[p.type] || "글"); thumb.appendChild(badge);
     c.appendChild(thumb);
@@ -509,9 +509,13 @@
     var prev = el("button", "fb-lb-nav prev", "‹"); prev.onclick = function (e) { e.stopPropagation(); lbGo(-1); };
     var next = el("button", "fb-lb-nav next", "›"); next.onclick = function (e) { e.stopPropagation(); lbGo(1); };
     els.lbCounter = el("div", "fb-lb-count");
+    // position scrubber — jump to any image even across thousands of items
+    els.lbRange = el("input"); els.lbRange.type = "range"; els.lbRange.min = 0; els.lbRange.className = "fb-lb-range"; els.lbRange.title = "위치로 이동";
+    els.lbRange.addEventListener("input", function () { if (!S.lb) return; S.lb.i = +els.lbRange.value; lbRenderStage(); });
+    els.lbRange.addEventListener("change", function () { if (!S.lb) return; S.lb.i = +els.lbRange.value; lbRender(); lbEnsureWindow(); });
     els.lbThumbs = el("div", "fb-lb-thumbs");
     els.lb.appendChild(top); els.lb.appendChild(prev); els.lb.appendChild(els.lbStage); els.lb.appendChild(next);
-    els.lb.appendChild(els.lbCounter); els.lb.appendChild(els.lbThumbs);
+    els.lb.appendChild(els.lbCounter); els.lb.appendChild(els.lbRange); els.lb.appendChild(els.lbThumbs);
     els.lb.addEventListener("click", function (e) { if (e.target === els.lb || e.target === els.lbStage) closeLightbox(); });
     document.addEventListener("keydown", function (e) {
       if (!S.lb) return;
@@ -533,7 +537,7 @@
   }
   function closeLightbox() { if (els.lb) { els.lb.classList.remove("on"); els.lbStage.innerHTML = ""; } document.body.style.overflow = ""; S.lb = null; }
   function lbGo(d) { if (!S.lb) return; var n = S.lb.items.length; S.lb.i = (S.lb.i + d + n) % n; lbRender(); lbEnsureWindow(); }
-  function lbRender() {
+  function lbRenderStage() {
     var it = S.lb.items[S.lb.i];
     els.lbStage.innerHTML = "";
     if (it.type === "video") { var v = el("video"); v.src = it.url; v.controls = true; v.autoplay = true; v.playsInline = true; els.lbStage.appendChild(v); }
@@ -542,8 +546,9 @@
     if (href) { els.lbLink.href = href; els.lbLink.textContent = (it.post_title ? it.post_title.slice(0, 46) + "  " : "") + "원문 ↗"; els.lbLink.style.display = ""; }
     else els.lbLink.style.display = "none";
     els.lbCounter.textContent = (S.lb.i + 1) + " / " + S.lb.items.length;
-    lbHighlight();
+    if (els.lbRange) { els.lbRange.max = S.lb.items.length - 1; els.lbRange.value = S.lb.i; }
   }
+  function lbRender() { lbRenderStage(); lbHighlight(); }
   // The strip can hold thousands of items (the whole 미분류 set), so keep only a
   // window of thumbnails in the DOM — but EXTEND it by appending/prepending (never
   // clearing) so navigation is smooth with no flashing rebuild, and always keep a
@@ -590,8 +595,8 @@
   // you can flip through them all; a loose video (no thumb) opens its detail (plays).
   function fullImg(t) { return (t || "").replace(/&w=\d+$/, ""); }
   function openUncatLightbox(clicked) {
-    if (!clicked.thumb) { openPost(clicked.id); return; }
-    var list = filtered().filter(function (p) { return p.type === "uncat" && p.thumb; });
+    if (!clicked.thumb || clicked.vid) { openPost(clicked.id); return; }  // videos play in their detail
+    var list = filtered().filter(function (p) { return p.type === "uncat" && p.thumb && !p.vid; });
     var items = [], startIdx = 0;
     for (var i = 0; i < list.length; i++) {
       var p = list[i];

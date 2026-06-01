@@ -76,6 +76,8 @@ def post_to_row(post: dict, source: str = "facebook-export") -> tuple[str, str]:
         props["media_count"] = len(post["media"])
     if images:
         props["image_path"] = images[0]["abs_path"]  # gallery thumbnail
+    if videos:
+        props["video_path"] = videos[0]["abs_path"]  # poster-frame thumbnail (ffmpeg)
 
     # Body
     lines = [f"# {props['title']}", ""]

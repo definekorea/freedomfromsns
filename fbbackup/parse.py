@@ -275,6 +275,45 @@ def normalize_post(post: dict, subfolders, by_name, share_links: dict | None = N
     }
 
 
+def _merge_same_timestamp(records: list[dict]) -> list[dict]:
+    """Facebook exports a reshare-with-comment as TWO entries at the same
+    timestamp — one bare 'X shared a post.' (empty) and one carrying the comment —
+    so the post shows up twice AND both copies match the same fbid by timestamp
+    (→ identical Facebook links). Collapse same-timestamp EXPORT posts into one
+    (Facebook never posts two distinct things in the same second), keeping the
+    richest record and unioning media/links/text/fb_url. Loose media (uncat) and
+    timestampless rows are never merged."""
+    groups: dict[int, list[dict]] = {}
+    out: list[dict] = []
+    for r in records:
+        if r.get("source", "facebook-export") != "facebook-export" or not r["timestamp"]:
+            out.append(r)
+            continue
+        groups.setdefault(r["timestamp"], []).append(r)
+    for grp in groups.values():
+        if len(grp) == 1:
+            out.append(grp[0])
+            continue
+        base = max(grp, key=lambda r: (len(r["media"]), len(r["links"]), len((r["text"] or "").strip())))
+        seen_uri = {m["uri"] for m in base["media"]}
+        seen_url = {l["url"] for l in base["links"]}
+        for r in grp:
+            if r is base:
+                continue
+            for m in r["media"]:
+                if m["uri"] not in seen_uri:
+                    base["media"].append(m); seen_uri.add(m["uri"])
+            for l in r["links"]:
+                if l["url"] not in seen_url:
+                    base["links"].append(l); seen_url.add(l["url"])
+            if not (base["text"] or "").strip() and (r["text"] or "").strip():
+                base["text"] = r["text"]
+            if not base.get("fb_url") and r.get("fb_url"):
+                base["fb_url"] = r["fb_url"]
+        out.append(base)
+    return out
+
+
 def parse(export_root: Path, out_dir: Path) -> dict:
     """Parse the export; write posts.jsonl + media-manifest.json. Returns stats."""
     export_root = Path(export_root).expanduser()
@@ -304,6 +343,10 @@ def parse(export_root: Path, out_dir: Path) -> dict:
         with open(pf, encoding="utf-8") as fh:
             for raw in json.load(fh):
                 records.append(normalize_post(raw, subfolders, by_name, share_links, fbid_ts, fbid_tx))
+
+    before = len(records)
+    records = _merge_same_timestamp(records)  # collapse FB's reshare-split duplicates
+    print(f"  merged {before - len(records)} duplicate same-timestamp posts", flush=True)
 
     # Loose media (uncategorized photos / videos / album photos NOT in any post)
     # is ingested as type="uncat" so it lives in its own 미분류 bucket instead of

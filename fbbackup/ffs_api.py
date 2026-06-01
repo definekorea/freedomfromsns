@@ -208,13 +208,15 @@ def register(app: FastAPI, b) -> None:
             date = str(p.get("date") or "")
             if not date:
                 continue
-            thumb = ""
+            thumb, vid = "", bool(p.get("video_path"))
             img = p.get("image_path")
             if img:
                 thumb = f"/api/fb/files?path={quote(str(img))}&w=400"
+            elif p.get("video_path"):
+                thumb = f"/api/fb/vthumb?path={quote(str(p['video_path']))}&w=400"
             out.append({"id": r["id"], "date": date, "title": r["title"],
                         "type": str(p.get("type") or "status"),
-                        "excerpt": r["summary"], "thumb": thumb, "url": "",
+                        "excerpt": r["summary"], "thumb": thumb, "url": "", "vid": vid,
                         # "meaningless": no media, no link, no original to open, and
                         # no real text (empty or title==text) — hidden by default.
                         "meaningless": bool(r.get("empty"))})
