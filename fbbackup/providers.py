@@ -62,6 +62,14 @@ EMBED_PROVIDERS: dict[str, dict] = {
 _DEFAULTS = {
     "chat": {"provider": "gemini", "fast_model": "gemini-flash-latest", "precise_model": "gemini-3.5-flash"},
     "embedding": {"provider": "gemini", "model": "gemini-embedding-001"},
+    # Guardrails applied to PUBLIC (shared-link) chat only — the local owner is never
+    # limited. `public: false` lifts them entirely (for local-only use, local models,
+    # or "I don't mind the cost"). topic_lock keeps public chat on-archive-topic.
+    "limits": {"public": True, "topic_lock": True, "per_min": 6, "daily": 300, "allow_agent_public": False},
+    # Optional login gate for the PUBLIC URL. scope "off" = anyone with the link can
+    # browse (read-only); "site" = a passcode (login page) is required for the whole
+    # site — e.g. "web access only for myself". The owner (local) is never gated.
+    "access": {"scope": "off", "passcode": ""},
 }
 
 
@@ -77,6 +85,8 @@ def load_settings() -> dict:
         for sect in ("chat", "embedding"):
             if isinstance(disk.get(sect), dict):
                 s[sect].update({k: v for k, v in disk[sect].items() if v})
+        if isinstance(disk.get("limits"), dict):     # allow False/0 (don't drop falsy)
+            s["limits"].update({k: v for k, v in disk["limits"].items() if v is not None})
     except Exception:  # noqa: BLE001  (missing/corrupt → defaults)
         pass
     return s
@@ -87,6 +97,8 @@ def save_settings(s: dict) -> dict:
     for sect in ("chat", "embedding"):
         if isinstance(s.get(sect), dict):
             cur[sect].update({k: v for k, v in s[sect].items() if v is not None})
+    if isinstance(s.get("limits"), dict):
+        cur["limits"].update({k: v for k, v in s["limits"].items() if v is not None})
     (home() / "settings.json").write_text(json.dumps(cur, ensure_ascii=False, indent=2), "utf-8")
     return cur
 
@@ -193,17 +205,39 @@ def chat_complete(messages: list[dict], system: str, model: str, settings: dict 
     pid = settings["chat"].get("provider", "gemini")
     cat = CHAT_PROVIDERS.get(pid) or CHAT_PROVIDERS["gemini"]
     max_tokens, thinking = _budget(model, settings)
-    if cat["format"] == "gemini":
-        key = _gemini_key() or get_key(cat["key_env"])
-        if not key:
-            raise RuntimeError("Gemini API 키가 설정되지 않았습니다. 설정에서 키를 입력하세요.")
-        return _gemini_native(key, model, messages, system, max_tokens, thinking, 0.5)
-    key = get_key(cat["key_env"])
-    if cat["key_env"] and not key:
-        raise RuntimeError(f"{cat['label']} 키가 없습니다. 설정에서 입력하세요.")
-    if cat["format"] == "anthropic":
-        return _anthropic_chat(cat["base_url"], key, model, messages, system, max_tokens, 0.5)
-    return _openai_chat(cat["base_url"], key, model, messages, system, max_tokens, 0.5)
+    try:
+        if cat["format"] == "gemini":
+            key = _gemini_key() or get_key(cat["key_env"])
+            if not key:
+                raise RuntimeError("Gemini API 키가 설정되지 않았습니다. 설정에서 키를 입력하세요. "
+                                   "/ No Gemini key — connect one in Settings.")
+            return _gemini_native(key, model, messages, system, max_tokens, thinking, 0.5)
+        key = get_key(cat["key_env"])
+        if cat["key_env"] and not key:
+            raise RuntimeError(f"{cat['label']} 키가 없습니다. 설정에서 입력하세요. "
+                               f"/ No {cat['label']} key — connect one in Settings.")
+        if cat["format"] == "anthropic":
+            return _anthropic_chat(cat["base_url"], key, model, messages, system, max_tokens, 0.5)
+        return _openai_chat(cat["base_url"], key, model, messages, system, max_tokens, 0.5)
+    except urllib.error.HTTPError as e:
+        detail = ""
+        try:                                   # the upstream API's own error message — the real reason
+            raw = e.read().decode("utf-8", "replace")[:600]
+            err = (json.loads(raw) or {}).get("error")
+            detail = (err.get("message") if isinstance(err, dict) else err) or raw
+        except Exception:  # noqa: BLE001
+            detail = ""
+        if e.code in (401, 403):
+            raise RuntimeError(
+                f"{cat['label']} 키가 거부되었습니다 (HTTP {e.code}). 키가 맞는지, 그리고 해당 API가 "
+                f"활성화/결제됐는지 확인하세요. / {cat['label']} rejected the key (HTTP {e.code}) — "
+                f"check the key and that the API is enabled. [{str(detail)[:300]}]")
+        raise RuntimeError(f"{cat['label']} API 오류 (HTTP {e.code}). [{str(detail)[:300]}]")
+    except urllib.error.URLError as e:
+        raise RuntimeError(
+            f"{cat['label']}에 연결할 수 없습니다 — 로컬 모델(Ollama 등)이라면 실행 중인지 확인하세요. "
+            f"/ Couldn't reach {cat['label']} — if it's a local model (e.g. Ollama), is it running? "
+            f"({getattr(e, 'reason', '')})")
 
 
 def test_chat(provider: str, model: str) -> tuple[bool, str]:
