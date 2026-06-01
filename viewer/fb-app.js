@@ -18,7 +18,7 @@
       mon: "일월화수목금토", months: "1월 2월 3월 4월 5월 6월 7월 8월 9월 10월 11월 12월",
       related_searching: "  ·  관련 글 찾는 중…", semantic: "  ·  의미 검색",
       searching: "검색 중…", no_results: "결과가 없습니다.", no_results2: "결과 없음",
-      close: "닫기", view_original: "원문 보기 ↗", loading: "불러오는 중…",
+      close: "닫기", view_original: "원문 보기 ↗", loading: "불러오는 중…", prev: "이전", next: "다음",
       load_body_fail: "본문을 불러올 수 없습니다.", related: "관련 글", link_preview: "링크 미리보기…",
       source_fallback: "원본", lb_goto: "위치로 이동", original_short: "원문 ↗", untitled: "(무제)",
       chat_hi: "✦ 내 기록과 대화하기",
@@ -39,7 +39,7 @@
       mon: "SMTWTFS", months: "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec",
       related_searching: "  ·  finding related…", semantic: "  ·  semantic",
       searching: "Searching…", no_results: "No results.", no_results2: "No results",
-      close: "Close", view_original: "View original ↗", loading: "Loading…",
+      close: "Close", view_original: "View original ↗", loading: "Loading…", prev: "Previous", next: "Next",
       load_body_fail: "Couldn't load the post.", related: "Related", link_preview: "Link preview…",
       source_fallback: "Source", lb_goto: "Jump to position", original_short: "Original ↗", untitled: "(untitled)",
       chat_hi: "✦ Chat with my archive",
@@ -72,6 +72,7 @@
     chatBusy: false,
     semanticIds: null,          // semantic results for the current query (null = none/keyword)
     semanticLoading: false, searchToken: 0,
+    ctx: null,                  // ordered post ids for detail prev/next (current context)
     lang: (function () { try { return localStorage.getItem("ffs.lang") || (/^en/i.test(navigator.language || "") ? "en" : "ko"); } catch (e) { return "ko"; } })(),
     model: (function () { try { return localStorage.getItem("ffs.model") || (CFG.defaultModel || "gemini-2.5-flash"); } catch (e) { return CFG.defaultModel || "gemini-2.5-flash"; } })(),
     agent: (function () { try { var v = localStorage.getItem("ffs.agent"); return v === null ? true : v === "1"; } catch (e) { return true; } })(),
@@ -130,27 +131,34 @@
     buildModal();
   }
 
+  // The filter bar persists across all views (browse / calendar / chat) so the menu
+  // never vanishes. Content-type chips + count show on browse & calendar; the year
+  // dropdown is browse-only (the calendar's own year sidebar makes it redundant);
+  // chat carries only the global language toggle. The flag sits at the right edge.
   function renderFilters() {
     els.filters.innerHTML = "";
-    if (S.view !== "browse") return;
-    // Two groups: shown-by-default content, then a divider, then "click-into"
-    // buckets (링크/공유/미분류) that are hidden from 전체 — you open them on demand.
-    function chip(t, sec) {
-      var c = el("button", "fb-chip" + (sec ? " sec" : "") + (S.type === t ? " on" : ""), t === "all" ? tr("all") : typeLabel(t));
-      c.dataset.t = t; c.onclick = function () { S.type = t; S.shown = PAGE; renderBrowse(); };
-      return c;
+    els.count = null;
+    if (S.view !== "chat") {
+      // Two groups: shown-by-default content, then a divider, then "click-into"
+      // buckets (링크/공유/미분류) that are hidden from 전체 — you open them on demand.
+      function chip(t, sec) {
+        var c = el("button", "fb-chip" + (sec ? " sec" : "") + (S.type === t ? " on" : ""), t === "all" ? tr("all") : typeLabel(t));
+        c.dataset.t = t; c.onclick = function () { S.type = t; S.shown = PAGE; renderCurrentView(); };
+        return c;
+      }
+      ["all", "photo", "video", "status"].forEach(function (t) { els.filters.appendChild(chip(t, false)); });
+      els.filters.appendChild(el("div", "fb-chip-div"));
+      ["link", "share", "uncat"].forEach(function (t) { els.filters.appendChild(chip(t, true)); });
     }
-    ["all", "photo", "video", "status"].forEach(function (t) { els.filters.appendChild(chip(t, false)); });
-    els.filters.appendChild(el("div", "fb-chip-div"));
-    ["link", "share", "uncat"].forEach(function (t) { els.filters.appendChild(chip(t, true)); });
     els.filters.appendChild(el("div", "fb-sp"));
-    var yrs = uniqueYears();
-    var sel = el("select", "fb-year");
-    sel.appendChild(new Option(tr("year_all"), "all"));
-    yrs.forEach(function (y) { sel.appendChild(new Option(yearN(y), y)); });
-    sel.value = S.year; sel.onchange = function () { S.year = sel.value; S.shown = PAGE; renderBrowse(); };
-    els.filters.appendChild(sel);
-    els.count = el("div", "fb-count"); els.filters.appendChild(els.count);
+    if (S.view === "browse") {           // year dropdown only on browse (calendar has its sidebar)
+      var sel = el("select", "fb-year");
+      sel.appendChild(new Option(tr("year_all"), "all"));
+      uniqueYears().forEach(function (y) { sel.appendChild(new Option(yearN(y), y)); });
+      sel.value = S.year; sel.onchange = function () { S.year = sel.value; S.shown = PAGE; renderCurrentView(); };
+      els.filters.appendChild(sel);
+    }
+    if (S.view !== "chat") { els.count = el("div", "fb-count"); els.filters.appendChild(els.count); }
     var lang = el("button", "fb-lang", EN() ? "🇰🇷 한국어" : "🇺🇸 English");
     lang.title = EN() ? "한국어로 전환" : "Switch to English";
     lang.onclick = function () { setLang(EN() ? "ko" : "en"); };
@@ -168,7 +176,6 @@
     if (els.q) els.q.placeholder = tr("search_ph");
     var small = document.querySelector(".fb-brand small");
     if (small) small.textContent = tr("archive");
-    renderFilters();
     renderCurrentView();
   }
 
@@ -182,6 +189,7 @@
   //  The search query lives in the URL so it's restorable + back/forward-safe;
   //  doSearch updates it with replaceState (no history pile-up per keystroke).
   function renderCurrentView() {
+    renderFilters();                     // bar persists across all views
     if (S.view === "calendar") renderCalendar();
     else if (S.view === "chat") renderChat();
     else renderBrowse();
@@ -206,7 +214,6 @@
       if (q && q.length >= 2 && CFG.search) { S.semanticLoading = true; fireSemantic(q, token); }
       else S.semanticLoading = false;
     }
-    renderFilters();
     renderCurrentView();
   }
 
@@ -252,7 +259,7 @@
     els.tabBrowse.classList.toggle("on", true);
     els.tabCal.classList.toggle("on", false);
     if (els.tabChat) els.tabChat.classList.toggle("on", false);
-    renderFilters(); renderCurrentView();
+    renderCurrentView();
   }
 
   /* ── browse grid (filter + paginate, instant) ───────────────────────── */
@@ -273,10 +280,10 @@
   }
 
   function card(p) {
-    // Uncategorized media are "just images" — clicking one opens the full-screen
-    // lightbox over the WHOLE 미분류 set so you can navigate them all with the
-    // thumbnail strip, instead of a text-less detail modal.
-    var c = el("div", "fb-card"); c.onclick = function () { if (p.type === "uncat") openUncatLightbox(p); else openPost(p.id); };
+    // Clicking a card opens its detail, carrying the CURRENT context (the filtered
+    // list as shown — 전체 or 사진/영상/글/etc) so prev/next walks every item in it,
+    // regardless of type. The detail's own image zoom still uses the lightbox strip.
+    var c = el("div", "fb-card"); c.onclick = function () { openPost(p.id, contextIds()); };
     var isLink = p.type === "link" && p.link_url;
     var hasImage = !!p.thumb;
     var preview = (p.preview || p.excerpt || "").trim();
@@ -333,7 +340,6 @@
   }
 
   function renderBrowse() {
-    renderFilters();
     els.main.innerHTML = "";
     var list = filtered();
     if (els.count) {
@@ -357,7 +363,11 @@
 
   /* ── calendar (respects the active search/filter — a temporal view of it) ─ */
   function renderCalendar() {
-    var posts = filtered();
+    // Year is navigated by the calendar's own sidebar, so don't apply the year
+    // filter here (the browse year dropdown is hidden on calendar). Type + search
+    // still apply, so the chips filter the calendar too.
+    var posts = baseList().filter(passType);
+    if (els.count) els.count.textContent = countN(posts.length);
     var byDate = {}; posts.forEach(function (p) { (byDate[p.date.slice(0, 10)] = byDate[p.date.slice(0, 10)] || []).push(p); });
     var yrs = Object.keys(posts.reduce(function (a, p) { a[p.date.slice(0, 4)] = 1; return a; }, {})).sort().reverse();
     // if the current month has no matches, jump to the most recent one that does
@@ -396,7 +406,7 @@
         var row = el("div", "fb-agenda-row");
         row.appendChild(el("span", "fb-badge " + p.type, typeLabel(p.type)));
         row.appendChild(el("span", "fb-agenda-t", p.title || tr("untitled")));
-        row.onclick = function () { openPost(p.id); };
+        row.onclick = function () { openPost(p.id, yearPosts.map(function (x) { return x.id; })); };
         ag.appendChild(row);
       });
       main.appendChild(ag);
@@ -420,7 +430,7 @@
         cell.appendChild(n);
         dayItems.slice(0, 4).forEach(function (p) {
           var a = el("div", "fb-ev " + p.type, p.title || tr("untitled")); a.title = p.excerpt || p.title || "";
-          a.onclick = function () { openPost(p.id); };
+          a.onclick = function () { openPost(p.id, dayItems.map(function (x) { return x.id; })); };
           cell.appendChild(a);
         });
         if (dayItems.length > 4) {
@@ -463,7 +473,7 @@
       var t = el("span", "fb-agenda-t", p.title || tr("untitled"));
       row.appendChild(t);
       if (p.thumb) { var im = el("img", "fb-daypop-thumb"); im.loading = "lazy"; im.src = p.thumb; im.onerror = function () { im.remove(); }; row.appendChild(im); }
-      row.onclick = function () { closeDayPanel(); openPost(p.id); };
+      row.onclick = function () { closeDayPanel(); openPost(p.id, items.map(function (x) { return x.id; })); };
       els.dayPopList.appendChild(row);
     });
     els.dayPop.classList.add("on"); document.body.style.overflow = "hidden";
@@ -475,7 +485,12 @@
   function buildModal() {
     els.modal = el("div", "fb-modal");
     els.modal.addEventListener("click", function (e) { if (e.target === els.modal) closePost(); });
-    document.addEventListener("keydown", function (e) { if (e.key === "Escape" && els.modal.classList.contains("on")) closePost(); });
+    document.addEventListener("keydown", function (e) {
+      if (!els.modal.classList.contains("on") || S.lb) return;   // lightbox (if open) owns the keys
+      if (e.key === "Escape") closePost();
+      else if (e.key === "ArrowLeft") docNav(-1);
+      else if (e.key === "ArrowRight") docNav(1);
+    });
     document.body.appendChild(els.modal);
   }
   function closeModal() {
@@ -504,6 +519,17 @@
     bar.appendChild(x);
     bar.appendChild(el("div", "fb-date", p ? fmtDate(p.date) : ""));
     if (p && p.url) { var o = el("a", "fb-orig", tr("view_original")); o.href = p.url; o.target = "_blank"; o.rel = "noopener"; bar.appendChild(o); }
+    // context prev/next — walk every item in the list the user came from
+    var ctxPos = (S.ctx && S.ctx.length > 1) ? S.ctx.indexOf(id) : -1;
+    if (ctxPos >= 0) {
+      var nav = el("div", "fb-doc-nav");
+      var pv = el("button", "fb-doc-navbtn", "‹"); pv.title = tr("prev"); pv.onclick = function () { docNav(-1); };
+      var nx = el("button", "fb-doc-navbtn", "›"); nx.title = tr("next"); nx.onclick = function () { docNav(1); };
+      nav.appendChild(pv);
+      nav.appendChild(el("div", "fb-doc-pos", (ctxPos + 1) + " / " + S.ctx.length));
+      nav.appendChild(nx);
+      bar.appendChild(nav);
+    }
     doc.appendChild(bar);
     var body = el("div", "fb-doc-body");
     body.innerHTML = '<div class="fb-loading">' + tr("loading") + '</div>';
@@ -605,8 +631,9 @@
   // Open a post WITHOUT stacking history: first open pushes one entry; navigating
   // post→post replaces it. So browser-back closes the post once and returns to
   // the underlying view — never cycling through every post you peeked at.
-  function openPost(id) {
+  function openPost(id, ctxIds) {
     id = String(id);
+    S.ctx = (ctxIds && ctxIds.length) ? ctxIds.map(String) : null;   // null → no prev/next
     if (location.hash.indexOf("#post/") === 0) { history.replaceState(null, "", "#post/" + encodeURIComponent(id)); openDetail(id); }
     else location.hash = "#post/" + encodeURIComponent(id);
   }
@@ -706,19 +733,16 @@
     lbHighlight(); lbCenterThumb();
   }
   function lbCenterThumb() { var kids = els.lbThumbs.children; for (var k = 0; k < kids.length; k++) if (+kids[k].dataset.idx === S.lb.i) { kids[k].scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" }); return; } }
-  // Clicking an uncategorized image opens the whole 미분류 set in the lightbox so
-  // you can flip through them all; a loose video (no thumb) opens its detail (plays).
-  function fullImg(t) { return (t || "").replace(/&w=\d+$/, ""); }
-  function openUncatLightbox(clicked) {
-    if (!clicked.thumb || clicked.vid) { openPost(clicked.id); return; }  // videos play in their detail
-    var list = filtered().filter(function (p) { return p.type === "uncat" && p.thumb && !p.vid; });
-    var items = [], startIdx = 0;
-    for (var i = 0; i < list.length; i++) {
-      var p = list[i];
-      if (p.id === clicked.id) startIdx = items.length;
-      items.push({ url: fullImg(p.thumb), thumb: p.thumb, type: "image", post_title: p.title || "" });
-    }
-    openLightbox(items, startIdx);
+  // The list of post ids in the current filtered context (display order), used to
+  // power prev/next inside the detail view so it walks the whole context.
+  function contextIds() { return filtered().map(function (p) { return p.id; }); }
+  // Step to the prev/next post in the active context (S.ctx), wrapping around.
+  function docNav(d) {
+    if (!S.ctx || S.ctx.length < 2) return;
+    var cur = location.hash.indexOf("#post/") === 0 ? decodeURIComponent(location.hash.slice(6)) : null;
+    var i = cur ? S.ctx.indexOf(cur) : -1;
+    if (i < 0) return;
+    openPost(S.ctx[(i + d + S.ctx.length) % S.ctx.length], S.ctx);
   }
   /* ── AI chat (multi-turn, archive-grounded RAG; Gemini) ───────────────── */
   var CHAT_KEY = "ffs.chat.v1";
