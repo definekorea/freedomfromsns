@@ -30,6 +30,78 @@ from . import providers
 # Gemini agent lane (ffs_agent) still uses lane_generation_config for thinking.
 PRECISE_MODEL = "gemini-3.5-flash"          # the Gemini thinking model (agent lane)
 
+LOCAL_PORT = 8282                           # set by create_app — the port to tunnel to
+
+
+# ── publishing: a Cloudflare quick tunnel managed from the UI ──────────────────
+# A quick tunnel needs no account and gives a temporary https://*.trycloudflare.com
+# URL (changes on restart, fine for "show a friend"). The named-tunnel / stable
+# address path (an account + domain) is Phase C.
+_TUNNEL: dict = {"proc": None, "url": ""}
+
+
+def _cloudflared() -> str | None:
+    from shutil import which
+    return which("cloudflared")
+
+
+def _tunnel_status() -> dict:
+    proc = _TUNNEL["proc"]
+    running = bool(proc and proc.poll() is None)
+    if not running:
+        _TUNNEL["url"] = ""
+    return {"installed": bool(_cloudflared()), "running": running, "url": _TUNNEL["url"]}
+
+
+def _start_tunnel(port: int) -> dict:
+    import subprocess
+    import threading
+    if _TUNNEL["proc"] and _TUNNEL["proc"].poll() is None:
+        return _tunnel_status()                       # already running
+    exe = _cloudflared()
+    if not exe:
+        return _tunnel_status()
+    _TUNNEL["url"] = ""
+    # Run with a clean config home so an existing named-tunnel config
+    # (~/.cloudflared/config.yml, with its own ingress + 404 catch-all) isn't
+    # applied to our ephemeral quick tunnel. A quick tunnel needs no creds.
+    import tempfile
+    cf_home = os.path.join(tempfile.gettempdir(), "ffs-cf-home")
+    os.makedirs(cf_home, exist_ok=True)
+    env = dict(os.environ, HOME=cf_home, USERPROFILE=cf_home)
+    proc = subprocess.Popen([exe, "tunnel", "--url", f"http://localhost:{port}"],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, env=env)
+    _TUNNEL["proc"] = proc
+    rx = re.compile(r"https://[a-z0-9-]+\.trycloudflare\.com")
+
+    def _watch():
+        for line in proc.stderr:                       # cloudflared logs the URL to stderr
+            m = rx.search(line)
+            if m:
+                _TUNNEL["url"] = m.group(0)
+                break
+    threading.Thread(target=_watch, daemon=True).start()
+    return _tunnel_status()
+
+
+def _stop_tunnel() -> None:
+    proc = _TUNNEL["proc"]
+    if proc and proc.poll() is None:
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except Exception:  # noqa: BLE001
+            proc.kill()
+    _TUNNEL["proc"] = None
+    _TUNNEL["url"] = ""
+
+
+def _request_is_local(request: Request) -> bool:
+    """True only for loopback Host — so a remote visitor reaching the server THROUGH
+    the tunnel (Host = *.trycloudflare.com) can't start/stop tunnels or publish."""
+    host = (request.headers.get("host") or "").rsplit(":", 1)[0].strip("[]")
+    return host in ("localhost", "127.0.0.1", "::1", "")
+
 
 def lane_generation_config(model: str, temperature: float) -> dict:
     """Per-lane generationConfig for the native-Gemini agent lane. The precise
@@ -325,6 +397,23 @@ def register(app: FastAPI, b) -> None:
             return JSONResponse({"error": "no fbid"}, status_code=400)
         set_erased(b, fbids, flag)
         return {"fbids": fbids, "erased": flag, "count": len(fbids)}
+
+    @app.get("/api/publish/status")
+    def publish_status():
+        return _tunnel_status()
+
+    @app.post("/api/publish/start")
+    async def publish_start(request: Request):
+        if not _request_is_local(request):
+            return JSONResponse({"error": "local only"}, status_code=403)
+        return _start_tunnel(LOCAL_PORT)
+
+    @app.post("/api/publish/stop")
+    async def publish_stop(request: Request):
+        if not _request_is_local(request):
+            return JSONResponse({"error": "local only"}, status_code=403)
+        _stop_tunnel()
+        return {"running": False}
 
     @app.post("/api/media")
     async def media(request: Request):

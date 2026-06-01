@@ -321,7 +321,10 @@ Reordered around the §0.1 ladder: **ship Tier 0 the fastest, make AI an unlock.
    never blocks browse. (S–M; `embed` is already resumable.)
 7. **"Chat with your archive" (Tier 2)** unlock card + **Public mode** for the chat
    (throttle + topic-lock + cost cap) (§6). (M)
-8. **First-run browser tour** + the **Publish** button in the dashboard. (M)
+8. ✅ **Publish button** in the UI (🌐) — warns to privatise sensitive posts and
+   that reshares are mostly missing, then starts a **Cloudflare quick tunnel**
+   (`/api/publish/start|stop|status`, loopback-only, isolated config home) and
+   shows the temporary URL with copy + stop. (M) — done. *(First-run tour still TODO.)*
 9. **Named-tunnel helper** (`ffs publish --target cloudflare-tunnel`) that scripts
    Level 2 + writes a `config.yml` + optional service install. (M)
 10. **Dockerfile + compose** for always-on. (S)

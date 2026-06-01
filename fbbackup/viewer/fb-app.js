@@ -48,6 +48,15 @@
       copy: "복사", copied: "복사됨", copy_title: "답변 복사", regen: "다시", regen_title: "다시 생성",
       del: "삭제", del_title: "이 질문·답변 삭제", no_response: "(응답 없음)",
       err_busy: "요청이 많아요. 잠시 후 다시 시도해 주세요.", err_unavailable: "지금은 AI를 사용할 수 없어요. 잠시 후 다시 시도해 주세요.",
+      publish: "웹에 공개", pub_title: "웹에 공개하기",
+      pub_warn: "공개하기 전에 확인하세요",
+      pub_warn_private: "비공개로 두고 싶은 글은 먼저 비공개(🔒)로 설정하세요 — 링크를 받은 사람은 공개 상태의 모든 글을 볼 수 있습니다.",
+      pub_warn_reshare: "공유(리셰어)한 글은 페이스북 데이터에 없어 대부분 표시되지 않습니다.",
+      pub_create: "공개 링크 만들기", pub_creating: "링크 만드는 중… (몇 초 걸려요)",
+      pub_live: "이제 이 주소로 누구나 볼 수 있어요:", pub_stop: "공개 중지", pub_stopped: "공개를 중지했습니다.",
+      pub_copy: "복사", pub_copied: "복사됨 ✓",
+      pub_need_cf: "공개하려면 cloudflared가 필요합니다. 설치 안내:",
+      pub_note: "이 컴퓨터와 앱이 켜져 있는 동안만 작동하는 임시 주소이며, 재시작하면 바뀝니다. (고정 주소는 곧 지원 예정)",
     },
     en: {
       archive: "Archive", browse: "Browse", calendar: "Calendar", aichat: "✦ AI Chat",
@@ -81,6 +90,15 @@
       copy: "Copy", copied: "Copied", copy_title: "Copy answer", regen: "Retry", regen_title: "Regenerate",
       del: "Delete", del_title: "Delete this Q&A", no_response: "(no response)",
       err_busy: "Too many requests. Please try again shortly.", err_unavailable: "AI is unavailable right now. Please try again shortly.",
+      publish: "Publish", pub_title: "Publish to the web",
+      pub_warn: "Before you publish",
+      pub_warn_private: "Set any posts you want kept private to private (🔒) first — anyone with the link can see everything that's public.",
+      pub_warn_reshare: "Reshared posts mostly won't appear — they aren't in Facebook's export.",
+      pub_create: "Create a public link", pub_creating: "Creating your link… (a few seconds)",
+      pub_live: "Anyone with this link can now view your archive:", pub_stop: "Stop sharing", pub_stopped: "Sharing stopped.",
+      pub_copy: "Copy", pub_copied: "Copied ✓",
+      pub_need_cf: "Publishing needs cloudflared. Install it:",
+      pub_note: "A temporary link that works only while this computer and app are running, and changes on restart. (A stable address is coming soon.)",
     },
   };
   function tr(k) { var d = I18N[S.lang] || I18N.ko; return k in d ? d[k] : (I18N.ko[k] != null ? I18N.ko[k] : k); }
@@ -275,6 +293,9 @@
       els.filters.appendChild(selBtn);
     }
     if (S.view !== "chat" && S.view !== "settings") { els.count = el("div", "fb-count"); els.filters.appendChild(els.count); }
+    var pub = el("button", "fb-theme", "🌐"); pub.title = tr("publish");
+    pub.onclick = openPublish;
+    els.filters.appendChild(pub);
     var gear = el("button", "fb-theme" + (S.view === "settings" ? " on" : ""), "⚙"); gear.title = tr("settings");
     gear.onclick = function () { location.hash = "#settings"; };
     els.filters.appendChild(gear);
@@ -300,6 +321,89 @@
     if (els.tabChat) els.tabChat.textContent = tr("aichat");
     if (els.q) els.q.placeholder = tr("search_ph");
     renderCurrentView();
+  }
+
+  /* ── publish: a quick Cloudflare tunnel, started from the UI, with warnings ───
+     Loopback-only on the server. Warns to privatise sensitive posts and that
+     reshares are mostly missing before handing out a temporary public URL. */
+  function buildPublishModal() {
+    els.pub = el("div", "fb-pub-overlay");
+    var card = el("div", "fb-pub");
+    var x = el("button", "fb-pub-x", "×"); x.title = tr("close"); x.onclick = closePublish;
+    var warn = el("div", "fb-pub-warn");
+    warn.appendChild(el("div", "fb-pub-warn-h", "⚠ " + tr("pub_warn")));
+    var ul = el("ul", "fb-pub-warn-list");
+    ul.appendChild(el("li", null, tr("pub_warn_private")));
+    ul.appendChild(el("li", null, tr("pub_warn_reshare")));
+    warn.appendChild(ul);
+    els.pubBody = el("div", "fb-pub-body");
+    card.appendChild(x);
+    card.appendChild(el("h2", "fb-pub-h", tr("pub_title")));
+    card.appendChild(warn);
+    card.appendChild(els.pubBody);
+    card.appendChild(el("div", "fb-pub-note", tr("pub_note")));
+    els.pub.appendChild(card);
+    els.pub.addEventListener("click", function (e) { if (e.target === els.pub) closePublish(); });
+    document.body.appendChild(els.pub);
+  }
+  function openPublish() {
+    if (!els.pub) buildPublishModal();
+    els.pub.classList.add("on"); document.body.style.overflow = "hidden";
+    renderPublishBody();
+  }
+  function closePublish() { if (els.pub) els.pub.classList.remove("on"); document.body.style.overflow = ""; }
+  function pubStatus() { return fetch("/api/publish/status").then(function (r) { return r.json(); }); }
+  function renderPublishBody() {
+    pubStatus().then(function (s) {
+      if (!els.pub) return;
+      if (!s.installed) return pubShowNeedCf();
+      if (s.running && s.url) return pubShowLive(s.url);
+      if (s.running) { pubShowCreating(); return pubPollUrl(); }
+      els.pubBody.innerHTML = "";
+      var btn = el("button", "fb-pub-btn primary", tr("pub_create"));
+      btn.onclick = pubStart;
+      els.pubBody.appendChild(btn);
+    }).catch(function () {});
+  }
+  function pubShowNeedCf() {
+    els.pubBody.innerHTML = "";
+    var m = el("div", "fb-pub-need");
+    m.appendChild(document.createTextNode(tr("pub_need_cf") + " "));
+    var a = el("a", null, "developers.cloudflare.com ↗");
+    a.href = "https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/";
+    a.target = "_blank"; a.rel = "noopener";
+    m.appendChild(a); els.pubBody.appendChild(m);
+  }
+  function pubShowCreating() { els.pubBody.innerHTML = ""; els.pubBody.appendChild(el("div", "fb-pub-creating", tr("pub_creating"))); }
+  function pubStart() {
+    pubShowCreating();
+    fetch("/api/publish/start", { method: "POST" }).then(function (r) { return r.json(); })
+      .then(function (s) { if (!s.installed) return pubShowNeedCf(); pubPollUrl(); })
+      .catch(function () { renderPublishBody(); });
+  }
+  function pubPollUrl() {
+    var tries = 0;
+    (function loop() {
+      pubStatus().then(function (s) {
+        if (!els.pub) return;
+        if (s.url) return pubShowLive(s.url);
+        if (!s.running || ++tries > 45) return renderPublishBody();
+        setTimeout(loop, 1000);
+      }).catch(function () { setTimeout(loop, 1500); });
+    })();
+  }
+  function pubShowLive(url) {
+    els.pubBody.innerHTML = "";
+    els.pubBody.appendChild(el("div", "fb-pub-live", tr("pub_live")));
+    var row = el("div", "fb-pub-urlrow");
+    var a = el("a", "fb-pub-url", url); a.href = url; a.target = "_blank"; a.rel = "noopener";
+    var copy = el("button", "fb-pub-btn", tr("pub_copy"));
+    copy.onclick = function () { try { navigator.clipboard.writeText(url); copy.textContent = tr("pub_copied"); } catch (e) {} };
+    row.appendChild(a); row.appendChild(copy);
+    els.pubBody.appendChild(row);
+    var stop = el("button", "fb-pub-btn danger", tr("pub_stop"));
+    stop.onclick = function () { stop.disabled = true; fetch("/api/publish/stop", { method: "POST" }).then(function () { renderPublishBody(); }); };
+    els.pubBody.appendChild(stop);
   }
 
   function uniqueYears() { var s = {}; S.posts.forEach(function (p) { s[p.date.slice(0, 4)] = 1; }); return Object.keys(s).sort().reverse(); }

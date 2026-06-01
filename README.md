@@ -91,6 +91,8 @@ curl -fsSL https://raw.githubusercontent.com/definekorea/freedomfromsns/master/i
 
 모든 것은 `~/ffs/` 한 폴더에 정리됩니다 — 페이스북 데이터(`~/ffs/data/`), 색인, 아카이브, 설정. 다음부터는 `ffs serve`로 실행하면 됩니다.
 
+친구에게 보여주고 싶다면 앱 상단의 **🌐 (웹에 공개)** 버튼으로 임시 공개 링크(Cloudflare)를 만들 수 있습니다 — 공개 전에 비공개로 둘 글은 비공개로 돌리라고 안내해 줍니다.
+
 ---
 
 # English
@@ -160,6 +162,8 @@ curl -fsSL https://raw.githubusercontent.com/definekorea/freedomfromsns/master/i
 3. **(Optional) Turn on more** — enable *Smart search* (Tier 1) or *Chat* (Tier 2) from inside the app whenever you want. Chat connects a **free or paid AI API key (Gemini, DeepSeek, etc.)** in Settings.
 
 Everything lives in one folder, `~/ffs/` — your Facebook data (`~/ffs/data/`), index, archive, and config. From then on, just run `ffs serve`.
+
+To show a friend, the **🌐 Publish** button in the app creates a temporary public link (Cloudflare) — it reminds you to set sensitive posts to private first.
 
 ### From source (development)
 

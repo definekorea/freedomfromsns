@@ -23,7 +23,7 @@ _VIEWER = _PKG / "viewer"   # bundled inside the package so a `uv tool install` 
 
 
 def create_app(spaces_root: Path, export_root: Path,
-               chat_model: str = "gemini-flash-latest") -> FastAPI:
+               chat_model: str = "gemini-flash-latest", port: int = 8282) -> FastAPI:
     spaces_root = Path(spaces_root).expanduser()
     if not spaces_root.is_dir():
         raise SystemExit(f"No rows at {spaces_root} — run `ffs build` first.")
@@ -33,6 +33,7 @@ def create_app(spaces_root: Path, export_root: Path,
     b = SpacesBackend(spaces_root, media_roots=[Path(export_root).expanduser()], prefix="/api/fb")
     b.register(app, prefix="/api/fb")
     ffs_api.DEFAULT_MODEL = chat_model
+    ffs_api.LOCAL_PORT = int(port)     # the port the publish tunnel points at
     ffs_api.register(app, b)
 
     @app.on_event("startup")
@@ -93,7 +94,8 @@ def _reload_app() -> FastAPI:
     """App factory for `--reload` (uvicorn must import the app by string).
     Reads the paths the parent stashed in the env before handing off."""
     return create_app(os.environ["FFS_SPACES"], os.environ["FFS_EXPORT"],
-                      os.environ.get("FFS_CHAT_MODEL", "gemini-flash-latest"))
+                      os.environ.get("FFS_CHAT_MODEL", "gemini-flash-latest"),
+                      int(os.environ.get("FFS_PORT", "8282")))
 
 
 def serve(spaces_root: Path, export_root: Path, host: str = "127.0.0.1",
@@ -107,8 +109,9 @@ def serve(spaces_root: Path, export_root: Path, host: str = "127.0.0.1",
         os.environ["FFS_SPACES"] = str(spaces_root)
         os.environ["FFS_EXPORT"] = str(export_root)
         os.environ["FFS_CHAT_MODEL"] = chat_model
+        os.environ["FFS_PORT"] = str(port)
         uvicorn.run("fbbackup.ffs_server:_reload_app", factory=True, host=host,
                     port=port, reload=True, reload_dirs=[str(_PKG)],
                     reload_includes=["*.py"])
     else:
-        uvicorn.run(create_app(spaces_root, export_root, chat_model), host=host, port=port)
+        uvicorn.run(create_app(spaces_root, export_root, chat_model, port), host=host, port=port)
