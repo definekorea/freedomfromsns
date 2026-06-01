@@ -1,6 +1,9 @@
 <div align="center">
 
-<img src="docs/img/logo.png" alt="FreedomFromSNS" width="360">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/logo-dark.svg">
+  <img src="docs/img/logo-light.svg" alt="FreedomFromSNS" width="380">
+</picture>
 
 **페이스북에 흩어진 당신의 기록을, 당신의 컴퓨터에서 되살립니다.**
 **Bring your Facebook archive back to life — fast, private, on your own machine.**
