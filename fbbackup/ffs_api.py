@@ -47,25 +47,42 @@ _CHAT_SYS = (
 )
 
 
-# ── per-post privacy ────────────────────────────────────────────────────────
-# FB exports carry no audience, so every post's "original" is public (set in
-# parse.py → md frontmatter). The user marks individual posts private here; those
-# marks live in a sidecar in the index dir so they survive `ffs build` (which
-# rewrites the markdown). A post is private when its effective privacy != public;
-# private posts stay fully visible locally but are excluded from the shareable
-# static export (export_static.py).
+# ── per-post user state: privacy + erase ─────────────────────────────────────
+# We never touch the user's data. Per-post decisions (mark private, mark erased)
+# live in our OWN sidecars in the index dir, keyed by fb_id, so they survive
+# `ffs build` rewriting the markdown. Both are reflected in the display and gate
+# the shareable static export.
+#   • privacy: FB exports carry no audience, so the parsed default is public; a
+#     private post stays visible locally but is excluded from the export.
+#   • erased:  a soft delete — hidden from every normal view (recoverable in the
+#     trash) and excluded from the export. The data is never deleted.
 _OVERRIDES_NAME = "privacy-overrides.json"
+_ERASED_NAME = "erased-overrides.json"
 
 
-def _overrides_path(b):
-    return b._index_dir / _OVERRIDES_NAME
+def _sidecar(b, name: str):
+    return b._index_dir / name
+
+
+def _load_sidecar(b, name: str) -> dict:
+    try:
+        return json.loads(_sidecar(b, name).read_text("utf-8")) or {}
+    except Exception:  # noqa: BLE001  (missing / unreadable → none)
+        return {}
+
+
+def _save_sidecar(b, name: str, data: dict) -> None:
+    p = _sidecar(b, name)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(data, ensure_ascii=False, indent=0), "utf-8")
 
 
 def load_overrides(b) -> dict:
-    try:
-        return json.loads(_overrides_path(b).read_text("utf-8")) or {}
-    except Exception:  # noqa: BLE001  (missing / unreadable → none)
-        return {}
+    return _load_sidecar(b, _OVERRIDES_NAME)
+
+
+def load_erased(b) -> dict:
+    return _load_sidecar(b, _ERASED_NAME)
 
 
 def effective_privacy(props: dict, overrides: dict, post_id: str) -> str:
@@ -75,15 +92,26 @@ def effective_privacy(props: dict, overrides: dict, post_id: str) -> str:
     return str(props.get("privacy") or "public")
 
 
-def _save_override(b, post_id: str, privacy: str) -> None:
+def set_privacy(b, fbids: list, privacy: str) -> dict:
     ov = load_overrides(b)
-    if privacy == "public":
-        ov.pop(post_id, None)        # public is the default → don't store it
-    else:
-        ov[post_id] = privacy
-    p = _overrides_path(b)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(ov, ensure_ascii=False, indent=0), "utf-8")
+    for fid in fbids:
+        if privacy == "public":
+            ov.pop(fid, None)         # public is the default → store sparsely
+        else:
+            ov[fid] = privacy
+    _save_sidecar(b, _OVERRIDES_NAME, ov)
+    return ov
+
+
+def set_erased(b, fbids: list, erased: bool) -> dict:
+    ev = load_erased(b)
+    for fid in fbids:
+        if erased:
+            ev[fid] = True
+        else:
+            ev.pop(fid, None)
+    _save_sidecar(b, _ERASED_NAME, ev)
+    return ev
 
 
 def _plain(body: str) -> str:
@@ -242,13 +270,14 @@ def register(app: FastAPI, b) -> None:
     def index():
         rows = b._ensure_index("default")["rows"]
         overrides = load_overrides(b)
+        erased = load_erased(b)
         out = []
         for r in rows:
             p = r["props"]
             date = str(p.get("date") or "")
             if not date:
                 continue
-            fbid = str(p.get("fb_id") or "")   # stable key for privacy overrides
+            fbid = str(p.get("fb_id") or "")   # stable key for privacy/erase sidecars
             private = effective_privacy(p, overrides, fbid) != "public"
             thumb, vid = "", bool(p.get("video_path"))
             img = p.get("image_path")
@@ -265,6 +294,9 @@ def register(app: FastAPI, b) -> None:
                         # private = excluded from the shareable static export only;
                         # still fully visible in the local browser (a 🔒 badge).
                         "private": private, "fbid": fbid,
+                        # erased = soft-deleted: hidden from normal views, shown
+                        # only in the trash (recoverable). Data is never deleted.
+                        "erased": fbid in erased,
                         # "empty": no media, no link, no real text (title==text) —
                         # nothing to show, hidden from every view. (Reshares are NOT
                         # empty-by-fiat anymore — they live in the 공유 bucket.)
@@ -272,22 +304,46 @@ def register(app: FastAPI, b) -> None:
         out.sort(key=lambda r: r["date"], reverse=True)  # newest first
         return JSONResponse(out)
 
+    def _fbids(body) -> list:
+        """Accept either {fbid} (single) or {fbids:[…]} (bulk)."""
+        ids = (body or {}).get("fbids")
+        if isinstance(ids, list):
+            return [str(x) for x in ids if x]
+        one = str((body or {}).get("fbid") or "")
+        return [one] if one else []
+
     @app.post("/api/privacy")
-    async def set_privacy(request: Request):
-        """Mark one post public/private. Body: {fbid, privacy:'public'|'private'}.
+    async def privacy(request: Request):
+        """Mark posts public/private. Body: {fbid|fbids, privacy:'public'|'private'}.
         Persists to the index-dir sidecar; gates the static export, not local view."""
         try:
             body = await request.json()
         except Exception:  # noqa: BLE001
             body = {}
-        fbid = str((body or {}).get("fbid") or "")
+        fbids = _fbids(body)
         privacy = str((body or {}).get("privacy") or "public")
-        if not fbid:
+        if not fbids:
             return JSONResponse({"error": "no fbid"}, status_code=400)
         if privacy not in ("public", "private"):
             privacy = "public"
-        _save_override(b, fbid, privacy)
-        return {"fbid": fbid, "privacy": privacy, "private": privacy != "public"}
+        set_privacy(b, fbids, privacy)
+        return {"fbids": fbids, "privacy": privacy, "private": privacy != "public", "count": len(fbids)}
+
+    @app.post("/api/erase")
+    async def erase(request: Request):
+        """Soft-delete / restore posts. Body: {fbid|fbids, erased:true|false}.
+        Never deletes data — records the mark in our own sidecar; the post is
+        hidden from normal views (recoverable in the trash) and never exported."""
+        try:
+            body = await request.json()
+        except Exception:  # noqa: BLE001
+            body = {}
+        fbids = _fbids(body)
+        flag = bool((body or {}).get("erased", True))
+        if not fbids:
+            return JSONResponse({"error": "no fbid"}, status_code=400)
+        set_erased(b, fbids, flag)
+        return {"fbids": fbids, "erased": flag, "count": len(fbids)}
 
     @app.post("/api/search")
     async def search(request: Request):

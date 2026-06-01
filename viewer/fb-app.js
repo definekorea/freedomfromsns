@@ -14,7 +14,8 @@
     ko: {
       archive: "아카이브", browse: "둘러보기", calendar: "달력", aichat: "✦ AI 대화",
       search_ph: "검색…", all: "전체", year_all: "모든 연도", load_fail: "콘텐츠를 불러오지 못했습니다.",
-      type_photo: "사진", type_video: "영상", type_link: "링크", type_status: "글", type_share: "공유", type_uncat: "미분류",
+      type_photo: "사진", type_video: "영상", type_link: "링크", type_status: "글", type_share: "공유", type_uncat: "미분류", type_trash: "휴지통",
+      sel_start: "선택", sel_done: "완료", sel_all: "전체 선택", sel_none: "선택 해제", sel_count: "개 선택됨", sel_erase: "삭제", sel_restore: "복원",
       mon: "일월화수목금토", months: "1월 2월 3월 4월 5월 6월 7월 8월 9월 10월 11월 12월",
       related_searching: "  ·  관련 글 찾는 중…", semantic: "  ·  의미 검색",
       searching: "검색 중…", no_results: "결과가 없습니다.", no_results2: "결과 없음",
@@ -37,7 +38,8 @@
     en: {
       archive: "Archive", browse: "Browse", calendar: "Calendar", aichat: "✦ AI Chat",
       search_ph: "Search…", all: "All", year_all: "All years", load_fail: "Couldn't load content.",
-      type_photo: "Photos", type_video: "Videos", type_link: "Links", type_status: "Text", type_share: "Shares", type_uncat: "Unsorted",
+      type_photo: "Photos", type_video: "Videos", type_link: "Links", type_status: "Text", type_share: "Shares", type_uncat: "Unsorted", type_trash: "Trash",
+      sel_start: "Select", sel_done: "Done", sel_all: "Select all", sel_none: "Clear", sel_count: " selected", sel_erase: "Erase", sel_restore: "Restore",
       mon: "SMTWTFS", months: "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec",
       related_searching: "  ·  finding related…", semantic: "  ·  semantic",
       searching: "Searching…", no_results: "No results.", no_results2: "No results",
@@ -77,6 +79,7 @@
     semanticIds: null,          // semantic results for the current query (null = none/keyword)
     semanticLoading: false, searchToken: 0,
     ctx: null,                  // ordered post ids for detail prev/next (current context)
+    selMode: false, sel: {}, selAnchor: null,   // multi-select: mode, {id:true}, range anchor
     scroll: (function () { try { return JSON.parse(localStorage.getItem("ffs.scroll") || "{}") || {}; } catch (e) { return {}; } })(),
     _rendered: null,            // last view actually rendered (for enter-restore)
     lang: (function () { try { return localStorage.getItem("ffs.lang") || (/^en/i.test(navigator.language || "") ? "en" : "ko"); } catch (e) { return "ko"; } })(),
@@ -160,7 +163,7 @@
       }
       ["all", "photo", "video", "status"].forEach(function (t) { els.filters.appendChild(chip(t, false)); });
       els.filters.appendChild(el("div", "fb-chip-div"));
-      ["link", "share", "uncat"].forEach(function (t) { els.filters.appendChild(chip(t, true)); });
+      ["link", "share", "uncat", "trash"].forEach(function (t) { els.filters.appendChild(chip(t, true)); });
     }
     els.filters.appendChild(el("div", "fb-sp"));
     if (S.view === "browse") {           // year dropdown only on browse (calendar has its sidebar)
@@ -169,6 +172,11 @@
       uniqueYears().forEach(function (y) { sel.appendChild(new Option(yearN(y), y)); });
       sel.value = S.year; sel.onchange = function () { S.year = sel.value; S.shown = PAGE; renderCurrentView(); };
       els.filters.appendChild(sel);
+    }
+    if (S.view === "browse") {           // multi-select toggle (manage many posts at once)
+      var selBtn = el("button", "fb-selbtn" + (S.selMode ? " on" : ""), S.selMode ? tr("sel_done") : tr("sel_start"));
+      selBtn.onclick = toggleSelMode;
+      els.filters.appendChild(selBtn);
     }
     if (S.view !== "chat") { els.count = el("div", "fb-count"); els.filters.appendChild(els.count); }
     var lang = el("button", "fb-lang", EN() ? "🇰🇷 한국어" : "🇺🇸 English");
@@ -252,6 +260,7 @@
       try { localStorage.setItem("ffs.view", S.view); } catch (e) {}
       if (S.view !== "chat") requestAnimationFrame(restoreWinScroll);
     }
+    if (els.selBar) updateSelBar();   // hide the select bar when leaving browse
   }
   function routeFromHash() {
     if (!els.main) buildChrome();
@@ -329,23 +338,105 @@
     var q = S.q.toLowerCase();
     return S.posts.filter(function (p) { return !q || (p.title + " " + (p.excerpt || "")).toLowerCase().indexOf(q) >= 0; });
   }
-  var BUCKETS = { link: 1, share: 1, uncat: 1 };  // click-into; hidden from 전체
+  var BUCKETS = { link: 1, share: 1, uncat: 1, trash: 1 };  // click-into; hidden from 전체
   function passType(p) {
-    if (S.type === "all") return !BUCKETS[p.type] && !p.empty;   // default feed: real content only
-    if (BUCKETS[S.type]) return p.type === S.type;               // a bucket shows its whole type
-    return p.type === S.type && !p.empty;                        // 사진/영상/글: hide empties too
+    if (S.type === "trash") return !!p.erased;                  // trash shows ONLY erased
+    if (p.erased) return false;                                 // erased hidden from every other view
+    if (S.type === "all") return !BUCKETS[p.type] && !p.empty;  // default feed: real content only
+    if (BUCKETS[S.type]) return p.type === S.type;              // a bucket shows its whole type
+    return p.type === S.type && !p.empty;                       // 사진/영상/글: hide empties too
   }
   function passYear(p) { return S.year === "all" || p.date.slice(0, 4) === S.year; }
   function filtered() {
     return baseList().filter(function (p) { return passType(p) && passYear(p); });
   }
 
+  /* ── multi-select: manage many posts at once (privacy / soft-erase) ──────────
+     Works on browse AND search results (the same grid). Click toggles; Shift+
+     click range-selects in the displayed order; select-all / clear for groups.
+     A sticky bar drives bulk actions. Nothing is deleted — erase is a mark. */
+  function selCount() { return Object.keys(S.sel).length; }
+  function selectedFbids() {
+    return Object.keys(S.sel).map(function (id) { return S.byId[id] && S.byId[id].fbid; }).filter(Boolean);
+  }
+  function toggleSelMode() {
+    S.selMode = !S.selMode;
+    if (!S.selMode) { S.sel = {}; S.selAnchor = null; }
+    renderCurrentView();
+  }
+  function toggleSelect(p, e) {
+    if (e && e.shiftKey && S.selAnchor != null) {     // range: anchor → clicked, in display order
+      var ids = filtered().map(function (x) { return x.id; });
+      var a = ids.indexOf(S.selAnchor), b = ids.indexOf(p.id);
+      if (a >= 0 && b >= 0) { for (var i = Math.min(a, b); i <= Math.max(a, b); i++) S.sel[ids[i]] = true; }
+    } else {
+      if (S.sel[p.id]) delete S.sel[p.id]; else S.sel[p.id] = true;
+      S.selAnchor = p.id;
+    }
+    updateSelectionUI();
+  }
+  function selectAll() { filtered().forEach(function (p) { S.sel[p.id] = true; }); updateSelectionUI(); }
+  function deselectAll() { S.sel = {}; S.selAnchor = null; updateSelectionUI(); }
+  function refreshCards() {     // sync the .sel class on rendered cards (no full re-render)
+    if (!els.grid) return;
+    var kids = els.grid.children;
+    for (var i = 0; i < kids.length; i++) { var id = kids[i].dataset.id; if (id) kids[i].classList.toggle("sel", !!S.sel[id]); }
+  }
+  function updateSelectionUI() { refreshCards(); updateSelBar(); }
+
+  function buildSelBar() {
+    els.selBar = el("div", "fb-selbar");
+    els.selCount = el("div", "fb-selbar-n");
+    var all = el("button", "fb-selbar-btn", tr("sel_all")); all.onclick = selectAll;
+    var none = el("button", "fb-selbar-btn", tr("sel_none")); none.onclick = deselectAll;
+    els.selPublic = el("button", "fb-selbar-btn", "🌐 " + tr("public")); els.selPublic.onclick = function () { bulkPrivacy("public"); };
+    els.selPrivate = el("button", "fb-selbar-btn", "🔒 " + tr("private")); els.selPrivate.onclick = function () { bulkPrivacy("private"); };
+    els.selErase = el("button", "fb-selbar-btn danger"); els.selErase.onclick = bulkEraseOrRestore;
+    var done = el("button", "fb-selbar-btn done", tr("sel_done")); done.onclick = toggleSelMode;
+    [els.selCount, all, none, els.selPublic, els.selPrivate, els.selErase, done].forEach(function (x) { els.selBar.appendChild(x); });
+    document.body.appendChild(els.selBar);
+  }
+  function updateSelBar() {
+    if (!els.selBar) buildSelBar();
+    var n = selCount(), trash = S.type === "trash";
+    els.selBar.classList.toggle("on", S.selMode && S.view === "browse");
+    els.selCount.textContent = n + tr("sel_count");
+    els.selErase.textContent = trash ? ("♻ " + tr("sel_restore")) : ("🗑 " + tr("sel_erase"));
+    els.selPublic.style.display = els.selPrivate.style.display = trash ? "none" : "";
+    [els.selPublic, els.selPrivate, els.selErase].forEach(function (b) { b.disabled = n === 0; });
+  }
+  function bulkPrivacy(privacy) {
+    var fbids = selectedFbids(); if (!fbids.length) return;
+    fetch("/api/privacy", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fbids: fbids, privacy: privacy }) })
+      .then(function (r) { return r.json(); }).then(function () {
+        var priv = privacy !== "public";
+        Object.keys(S.sel).forEach(function (id) { if (S.byId[id]) S.byId[id].private = priv; });
+        renderCurrentView();
+      }).catch(function () {});
+  }
+  function bulkEraseOrRestore() {
+    var fbids = selectedFbids(); if (!fbids.length) return;
+    var restore = S.type === "trash";
+    fetch("/api/erase", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fbids: fbids, erased: !restore }) })
+      .then(function (r) { return r.json(); }).then(function () {
+        Object.keys(S.sel).forEach(function (id) { if (S.byId[id]) S.byId[id].erased = !restore; });
+        S.sel = {}; S.selAnchor = null;
+        renderCurrentView();   // erased posts leave the view; restored ones leave the trash
+      }).catch(function () {});
+  }
+
   function card(p) {
     // Clicking a card opens its detail, carrying the CURRENT context (the filtered
     // list as shown — 전체 or 사진/영상/글/etc) so prev/next walks every item in it,
     // regardless of type. The detail's own image zoom still uses the lightbox strip.
-    var c = el("div", "fb-card"); c.onclick = function () { openPost(p.id, contextIds()); };
+    var c = el("div", "fb-card" + (S.selMode && S.sel[p.id] ? " sel" : "")); c.dataset.id = p.id;
+    c.onclick = function (e) {
+      if (S.selMode) { e.preventDefault(); toggleSelect(p, e); return; }  // select instead of open
+      openPost(p.id, contextIds());
+    };
+    if (S.selMode) c.appendChild(el("div", "fb-check"));   // checkbox overlay
     if (p.private) { var lk = el("div", "fb-lock", "🔒"); lk.title = tr("privacy_hint"); c.appendChild(lk); }
+    if (p.erased) c.appendChild(el("div", "fb-erased-tag", "🗑"));
     var isLink = p.type === "link" && p.link_url;
     var hasImage = !!p.thumb;
     var preview = (p.preview || p.excerpt || "").trim();
@@ -412,7 +503,7 @@
       els.main.appendChild(el("div", "fb-empty", S.semanticLoading ? tr("searching") : tr("no_results")));
       return;
     }
-    var grid = el("div", "fb-grid");
+    var grid = el("div", "fb-grid" + (S.selMode ? " selmode" : "")); els.grid = grid;
     list.slice(0, S.shown).forEach(function (p) { grid.appendChild(card(p)); });
     els.main.appendChild(grid);
     if (S.shown < list.length) {
@@ -421,6 +512,7 @@
       var io = new IntersectionObserver(function (en) { if (en[0].isIntersecting) { io.disconnect(); S.shown += PAGE; renderBrowse(); } });
       io.observe(sentinel);
     }
+    updateSelBar();
   }
 
   /* ── calendar (respects the active search/filter — a temporal view of it) ─ */

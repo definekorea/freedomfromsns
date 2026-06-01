@@ -229,20 +229,23 @@ def export_static(index_dir: Path, out: Path, media_mode: str = "copy") -> dict:
     media_dir = out / "media"
 
     posts = [json.loads(l) for l in posts_path.open(encoding="utf-8") if l.strip()]
-    # Privacy gate: exclude any post the user marked private (sidecar in the index
-    # dir, keyed by fb_id). The default is public — FB exports no audience — so only
-    # posts explicitly marked private are withheld from this shareable snapshot.
-    try:
-        overrides = json.loads((Path(index_dir) / "privacy-overrides.json").read_text("utf-8")) or {}
-    except Exception:
-        overrides = {}
-    if overrides:
+    # Privacy + erase gate (sidecars in the index dir, keyed by fb_id). Withhold
+    # any post the user marked private OR erased from this shareable snapshot. The
+    # default is public — FB exports no audience — so only explicit marks are held.
+    def _load(name):
+        try:
+            return json.loads((Path(index_dir) / name).read_text("utf-8")) or {}
+        except Exception:
+            return {}
+    overrides, erased = _load("privacy-overrides.json"), _load("erased-overrides.json")
+    if overrides or erased:
         before = len(posts)
         posts = [p for p in posts
-                 if overrides.get(p.get("fb_id"), p.get("privacy", "public")) == "public"]
+                 if p.get("fb_id") not in erased
+                 and overrides.get(p.get("fb_id"), p.get("privacy", "public")) == "public"]
         held = before - len(posts)
         if held:
-            print(f"privacy: withholding {held} private post(s) from the static export")
+            print(f"privacy/erase: withholding {held} post(s) from the static export")
     # plan media copies (dedup by basename to keep the file list small)
     copied: dict[str, str] = {}
     if media_mode == "copy":
