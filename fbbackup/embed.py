@@ -5,15 +5,11 @@ with a no-key LOCAL fallback. Resolution (override via FBBACKUP_EMBED_PROVIDER):
 
   gemini  — Google `gemini-embedding-001` (best; uses GEMINI_*_API_KEY; paid =
             no rate limits; asymmetric retrieval via taskType)
-  weft    — apicascade POST /v1/embeddings (mistral-embed, 1024-d, 5-min cache,
-            free-pool). Auth = the shared cascade API_KEY in ~/.hermes/.env. The
-            ZERO-CONFIG default for Weft deployments: no extra key, no download.
   local   — fastembed (ONNX, CPU, no key, nothing leaves the machine). Default
-            model `jinaai/jina-embeddings-v3` (retrieval-grade, multilingual,
-            Gemini-class separation); set FBBACKUP_EMBED_MODEL to a concise one
-            (e.g. `snowflake/snowflake-arctic-embed-m`, 0.43 GB) to trade size.
+            model multilingual MiniLM (see EMBED_MODELS); set FBBACKUP_EMBED_MODEL
+            to trade size/quality.
 
-Resolution order with no override: gemini key → weft (apicascade) → local.
+Resolution order with no override: gemini key → local.
 
 Corpus + query MUST use the same provider/model — the choice is recorded in
 embed-meta.json and the backend reads it for query-time embedding. Outputs live
@@ -32,13 +28,10 @@ from pathlib import Path
 
 GEMINI_MODEL = "gemini-embedding-001"
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:embedContent"
-WEFT_EMBED_URL = os.environ.get("APICASCADE_URL", "http://localhost:8090").rstrip("/") + "/v1/embeddings"
 LOCAL_MODEL = os.environ.get("FBBACKUP_EMBED_MODEL",
                              "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
 # Per-provider score floor for "related" search (chat retrieval uses top-k rank).
-# weft = apicascade /v1/embeddings (mistral-embed, 1024-d) — tighter separation
-# than gemini/jina, so a higher floor.
-THRESHOLDS = {"gemini": 0.62, "weft": 0.78, "local": 0.40}  # local floor depends on the model (see below)
+THRESHOLDS = {"gemini": 0.62, "local": 0.40}  # local floor depends on the model (see below)
 
 # Curated local embedding models the setup tester picks from — measured on CPU
 # (8 vCPU / no GPU): see docs/local-models.md. RULED OUT for auto-selection:
@@ -70,26 +63,6 @@ def gemini_key() -> str:
     for var in ("GEMINI_PAID_API_KEY", "GEMINI_FREE_API_KEY", "GEMINI_API_KEY"):
         if os.environ.get(var):
             return os.environ[var]
-    try:
-        p = Path.home() / "dev" / "weft" / "apicascade" / ".env.local"
-        kv = dict(l.split("=", 1) for l in p.read_text(encoding="utf-8").splitlines()
-                  if "=" in l and not l.strip().startswith("#"))
-        for var in ("GEMINI_PAID_API_KEY", "GEMINI_FREE_API_KEY"):
-            if kv.get(var):
-                return kv[var].strip().strip('"').strip("'")
-    except Exception:
-        pass
-    return ""
-
-
-def weft_key() -> str:
-    """apicascade /v1/embeddings auth — shared cascade secret in ~/.hermes/.env."""
-    try:
-        for line in (Path.home() / ".hermes" / ".env").read_text(encoding="utf-8").splitlines():
-            if line.startswith("API_KEY="):
-                return line.split("=", 1)[1].strip().strip('"').strip("'")
-    except Exception:
-        pass
     return ""
 
 
@@ -99,9 +72,7 @@ def resolve_provider() -> str:
         return forced
     if gemini_key():       # best quality (asymmetric retrieval via taskType)
         return "gemini"
-    if weft_key():         # zero-config for Weft deployments (apicascade, cached)
-        return "weft"
-    return "local"         # no key at all → fastembed jina-v3 on CPU
+    return "local"         # no key → fastembed (multilingual MiniLM) on CPU
 
 
 # ── Gemini ───────────────────────────────────────────────────────────────────
@@ -117,26 +88,6 @@ def _gemini_one(text: str, key: str, task: str) -> list[float]:
                 raise
             time.sleep(1.5 * (attempt + 1))
     return []
-
-
-# ── weft (apicascade /v1/embeddings → mistral-embed, symmetric, cached) ───────
-def _weft_embed(texts: list[str], key: str, batch: int = 128) -> list[list[float]]:
-    out: list[list[float]] = []
-    for i in range(0, len(texts), batch):
-        body = json.dumps({"input": texts[i:i + batch]}).encode()
-        for attempt in range(4):
-            try:
-                req = urllib.request.Request(
-                    WEFT_EMBED_URL, data=body,
-                    headers={"Content-Type": "application/json", "Authorization": f"Bearer {key}"})
-                d = json.loads(urllib.request.urlopen(req, timeout=90).read())
-                out.extend(x["embedding"] for x in sorted(d["data"], key=lambda e: e["index"]))
-                break
-            except Exception:
-                if attempt == 3:
-                    raise
-                time.sleep(2 * (attempt + 1))
-    return out
 
 
 # ── local (fastembed) ────────────────────────────────────────────────────────
@@ -175,8 +126,6 @@ def _embed_batch(provider: str, texts: list[str], key: str) -> list[list[float]]
     if provider == "gemini":
         with ThreadPoolExecutor(max_workers=16) as ex:
             return list(ex.map(lambda t: _gemini_one(t, key, "RETRIEVAL_DOCUMENT"), texts))
-    if provider == "weft":
-        return _weft_embed(texts, key)
     return _local_embed(texts, False)
 
 
@@ -243,8 +192,6 @@ def embed_query(text: str, provider: str | None = None) -> list[float]:
     provider = provider or resolve_provider()
     if provider == "gemini":  # keys resolved per provider
         return _gemini_one(text, gemini_key(), "RETRIEVAL_QUERY")
-    if provider == "weft":
-        return _weft_embed([text], weft_key())[0]
     return _local_embed([text], True)[0]
 
 
@@ -287,8 +234,8 @@ def embed(spaces_root: Path, out_dir: Path, workspace: str = "default") -> dict:
     import numpy as np
 
     provider = resolve_provider()
-    key = gemini_key() if provider == "gemini" else (weft_key() if provider == "weft" else "")
-    if provider in ("gemini", "weft") and not key:
+    key = gemini_key() if provider == "gemini" else ""
+    if provider == "gemini" and not key:
         raise SystemExit(f"provider={provider} but no key")
     spaces_root = Path(spaces_root).expanduser()
     out_dir = Path(out_dir).expanduser()
@@ -311,9 +258,8 @@ def embed(spaces_root: Path, out_dir: Path, workspace: str = "default") -> dict:
               "embeddings; keyword search still works.", flush=True)
         return {"provider": provider, "count": 0, "dim": 0}
 
-    model = {"gemini": GEMINI_MODEL, "weft": "mistral-embed (apicascade)"}.get(provider, LOCAL_MODEL)
-    # Batch sizes per provider (remote = fewer requests under a rate limit).
-    batch = {"gemini": 256, "weft": 128}.get(provider, 256)
+    model = GEMINI_MODEL if provider == "gemini" else LOCAL_MODEL
+    batch = 256
     fp = _fingerprint(provider, model, ids)
     vecs = _load_ckpt(out_dir, fp)  # resume a prior run for THIS exact corpus
     start = len(vecs)

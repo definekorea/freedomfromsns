@@ -178,6 +178,27 @@ class _Turn:
         return [{"id": i, "title": t} for i, t in self.sources.items()][:20]
 
 
+def _err_message(e: Exception) -> str:
+    """Turn a failed Gemini call into a clear, actionable message — surface the
+    API's OWN error text (the real reason) and flag a rejected key, instead of a
+    bare 'HTTP Error 403'."""
+    import urllib.error
+    if isinstance(e, urllib.error.HTTPError):
+        detail = ""
+        try:
+            raw = e.read().decode("utf-8", "replace")[:600]
+            err = (json.loads(raw) or {}).get("error")
+            detail = (err.get("message") if isinstance(err, dict) else err) or raw
+        except Exception:  # noqa: BLE001
+            pass
+        if e.code in (401, 403):
+            return (f"Gemini 키가 거부되었습니다 (HTTP {e.code}) — 키가 맞는지, 그리고 Generative "
+                    f"Language API가 활성화됐는지 확인하세요. / Gemini rejected the key (HTTP {e.code}) — "
+                    f"check the key and that the Generative Language API is enabled. [{str(detail)[:200]}]")
+        return f"Gemini API 오류 (HTTP {e.code}). [{str(detail)[:200]}]"
+    return f"지금은 답변을 생성하지 못했습니다. ({str(e)[:140]})"
+
+
 def _call(model: str, key: str, contents: list, use_tools: bool = True) -> dict:
     from .ffs_api import lane_generation_config   # same per-lane thinking policy
     payload = {"systemInstruction": {"parts": [{"text": _SYS}]}, "contents": contents,
@@ -195,6 +216,11 @@ def agent_chat(b, messages: list[dict], model: str) -> dict:
     """Run the function-calling loop and return {answer, sources, media, model, steps}."""
     turn = _Turn(b)
     key = gemini_key()
+    if not key:
+        return {"answer": "AI 대화에는 Gemini API 키가 필요합니다 — 설정에서 무료 키를 연결하세요 "
+                          "(https://aistudio.google.com/apikey). / AI chat needs a Gemini API key — "
+                          "connect a free one in Settings.",
+                "sources": [], "media": [], "model": model, "steps": 0}
     contents = [{"role": "model" if m.get("role") == "assistant" else "user",
                  "parts": [{"text": (m.get("content") or "").strip()}]}
                 for m in messages if (m.get("content") or "").strip()]
@@ -206,7 +232,7 @@ def agent_chat(b, messages: list[dict], model: str) -> dict:
         try:
             resp = _call(model, key, contents, use_tools=True)
         except Exception as e:  # noqa: BLE001
-            return {"answer": f"지금은 답변을 생성하지 못했습니다. ({str(e)[:120]})",
+            return {"answer": _err_message(e),
                     "sources": turn.source_list(), "media": turn.media_list(),
                     "model": model, "steps": steps}
         cand = (resp.get("candidates") or [{}])[0]

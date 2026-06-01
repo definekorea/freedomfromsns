@@ -56,7 +56,8 @@ CHAT_PROVIDERS: dict[str, dict] = {
 EMBED_PROVIDERS: dict[str, dict] = {
     "gemini": {"label": "Google Gemini", "key_env": "GEMINI_PAID_API_KEY", "model": "gemini-embedding-001"},
     "openai": {"label": "OpenAI", "key_env": "OPENAI_API_KEY", "model": "text-embedding-3-small"},
-    "local": {"label": "Local · offline (fastembed)", "key_env": "", "model": "jinaai/jina-embeddings-v3"},
+    "local": {"label": "Local · offline (fastembed)", "key_env": "",
+              "model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"},
 }
 
 _DEFAULTS = {

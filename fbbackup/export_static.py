@@ -348,7 +348,7 @@ _INDEX_HTML = """<!doctype html>
 </header>
 <main id="feed"></main>
 <button id="more" hidden>Show more</button>
-<footer>Static archive · browse + keyword search · made with Weft</footer>
+<footer>Static archive · browse + keyword search · made with FreedomFromSNS</footer>
 <script src="app.js"></script>
 </body></html>
 """
