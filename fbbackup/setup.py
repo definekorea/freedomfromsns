@@ -588,6 +588,43 @@ def create_launcher(home: Path, name: str = "FreedomFromSNS", cli: str = "serve 
         return None
 
 
+def remove_app_artifacts(home: Path) -> list[str]:
+    """Remove launchers, the auto-start entry, and caches — but NEVER the data home
+    (data/index/archive/config/.env stay). Returns the paths removed."""
+    import shutil as _sh
+    removed: list[str] = []
+    names = ("FreedomFromSNS.cmd", "FreedomFromSNS.command", "FreedomFromSNS.sh",
+             "FreedomFromSNS (Add data).cmd", "FreedomFromSNS (Add data).command",
+             "FreedomFromSNS (Add data).sh")
+    dirs = {p for p in (_desktop_dir(), Path.home() / "Desktop",
+                        Path.home() / "OneDrive" / "Desktop", home) if p}
+    for d in dirs:
+        for n in names:
+            f = d / n
+            if f.exists():
+                try:
+                    f.unlink(); removed.append(str(f))
+                except Exception:  # noqa: BLE001
+                    pass
+    if disable_autostart():
+        removed.append("auto-start entry")
+    extra = [home / "ffs-server.cmd"]
+    cf = (Path(os.environ["LOCALAPPDATA"]) / "ffs") if (os.name == "nt" and os.environ.get("LOCALAPPDATA")) \
+        else (Path.home() / ".cache" / "ffs")
+    for f in extra:
+        if f.exists():
+            try:
+                f.unlink(); removed.append(str(f))
+            except Exception:  # noqa: BLE001
+                pass
+    if cf.exists():
+        try:
+            _sh.rmtree(cf); removed.append(str(cf))
+        except Exception:  # noqa: BLE001
+            pass
+    return removed
+
+
 def _startup_dir() -> Path | None:
     if os.name == "nt":
         ad = os.environ.get("APPDATA")

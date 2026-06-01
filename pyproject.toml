@@ -1,6 +1,6 @@
 [project]
 name = "freedomfromsns"
-version = "0.1.6"
+version = "0.1.7"
 description = "FreedomFromSNS — browse, search, and chat with your Facebook archive, locally. Gemini-powered."
 requires-python = ">=3.11"
 dependencies = [

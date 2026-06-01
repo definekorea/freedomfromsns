@@ -376,6 +376,21 @@ def cmd_setup(args) -> int:
     return 0
 
 
+def cmd_uninstall(args) -> int:
+    """Remove launchers, auto-start, and caches — keeping your data. Prints the one
+    command to remove the program itself (a running tool can't delete its own files)."""
+    from fbbackup import setup as wiz
+    home = _home()
+    os.environ["FBBACKUP_HOME"] = str(home)
+    removed = wiz.remove_app_artifacts(home)
+    print("Removed:" if removed else "Nothing to remove (already clean).", flush=True)
+    for r in removed:
+        print(f"  - {r}")
+    print(f"\n✓ Your archive is preserved at: {home}", flush=True)
+    print("To remove the program itself, run:  uv tool uninstall freedomfromsns")
+    return 0
+
+
 def cmd_autostart(args) -> int:
     """Turn auto-start-at-login on/off (or show status)."""
     from fbbackup import setup as wiz
@@ -607,10 +622,9 @@ def cmd_doctor(args) -> int:
         line("warn", "embeddings", "missing  → run `ffs embed` (semantic search + chat need it)")
 
     port = int((p["cfg"].get("serve", {}) or {}).get("port", 8282))
-    try:
-        urllib.request.urlopen(f"http://127.0.0.1:{port}/api/meta", timeout=3).read()
+    if _server_up("127.0.0.1", port):
         line("ok", "server", f"running on :{port}")
-    except Exception:  # noqa: BLE001
+    else:
         line("warn", "server", f"not running on :{port}  → run `ffs serve`")
 
     print("\n" + (f"✓ all set — open http://127.0.0.1:{port}" if state["ok"]
@@ -666,6 +680,8 @@ def _build_parser() -> argparse.ArgumentParser:
     aus = sub.add_parser("autostart", help="start the server at login (on/off/status)")
     aus.add_argument("state", nargs="?", choices=["on", "off", "status"], default="status")
 
+    sub.add_parser("uninstall", help="remove launchers/auto-start/caches (keeps your data)")
+
     sh = sub.add_parser("share", help="Cloudflare quick tunnel to a running server")
     sh.add_argument("--port", default="9119", help="local port to expose (default 9119)")
 
@@ -700,7 +716,7 @@ _DISPATCH = {
     "setup": cmd_setup,
     "parse": cmd_parse, "build": cmd_build, "embed": cmd_embed, "index": cmd_index,
     "serve": cmd_serve, "share": cmd_share, "tunnel": cmd_tunnel, "shortcut": cmd_shortcut,
-    "autostart": cmd_autostart, "status": cmd_status, "doctor": cmd_doctor,
+    "autostart": cmd_autostart, "uninstall": cmd_uninstall, "status": cmd_status, "doctor": cmd_doctor,
     "export-static": cmd_export_static, "publish": cmd_publish,
 }
 
