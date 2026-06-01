@@ -40,7 +40,7 @@
 - **카테고리** — 전체 · 사진 · 영상 · 글 · 링크 · 공유 · 미분류.
 - **전체화면 갤러리** — 사진 한 장을 열면 그 **카테고리 전체(수천 장)** 를 좌우로 넘겨봅니다. 한 게시물의 사진 몇 장에 갇히지 않습니다.
 - **검색** — 즉각적인 **키워드 검색(키 불필요)** + 의미로 찾는 **시맨틱 검색**(선택).
-- **AI 대화** — 내 *실제* 글과 사진을 근거로 답하는 채팅. URL을 지어내지 않고 진짜 사진을 찾아 보여줍니다(선택, AI 키 필요).
+- **AI 대화** — 내 *실제* 글과 사진을 근거로 답하는 채팅. URL을 지어내지 않고 진짜 사진을 찾아 보여줍니다(선택 — Gemini · DeepSeek 등 무료/유료 AI API 키 필요).
 - **링크 미리보기 · 영상 포스터 · 라이트박스 스크러버** — 디스크에 캐시되어 빠릅니다.
 - **36가지 테마**, 라이트/다크 · **한국어·English** UI.
 - **사생활 보호** — 전부 로컬에서 동작, 내보내기 파일은 읽기 전용, 글을 숨기거나 비공개로 태그(데이터는 지워지지 않음).
@@ -52,8 +52,8 @@
 | 단계 | 무엇을 | 필요한 것 |
 |---|---|---|
 | **0 — 내 아카이브** | 둘러보기 · 필터 · 타임라인 · **키워드 검색** | 아무것도 (키·다운로드 불필요) |
-| **1 — 똑똑한 검색** | 의미 기반(시맨틱) 검색 | 앱에서 선택: 로컬 모델 1회 다운로드(키 불필요) **또는** 무료 키 |
-| **2 — AI 대화** | 내 기록과 대화 | AI 연결(무료 구글 키 또는 본인 키) |
+| **1 — 똑똑한 검색** | 의미 기반(시맨틱) 검색 | 앱에서 선택: 로컬 모델 1회 다운로드(키 불필요) **또는** 무료 AI API 키(예: Gemini) |
+| **2 — AI 대화** | 내 기록과 대화 | AI API 키 — Gemini · DeepSeek 등 **무료 또는 유료** |
 
 ## 설치
 
@@ -74,7 +74,7 @@ curl -fsSL https://raw.githubusercontent.com/definekorea/freedomfromsns/master/i
 
 1. **데이터 내려받기** — 페이스북 → 설정 → 개인정보 → *내 정보 다운로드* → 형식 **JSON** → **게시물** 을 받아 압축을 풉니다.
 2. **설치 명령 실행** — 위 한 줄. 설치 마법사가 **언어를 묻고(한국어/English)**, 다운로드 폴더에서 데이터를 **자동으로 찾아**, 타임라인을 만들고, 브라우저를 엽니다(`http://localhost:8282`). 키 없이 둘러보기·검색이 바로 됩니다.
-3. **(선택) 더 켜기** — 앱 안에서 *똑똑한 검색*(1단계)이나 *AI 대화*(2단계)를 선택적으로 켭니다.
+3. **(선택) 더 켜기** — 앱 안에서 *똑똑한 검색*(1단계)이나 *AI 대화*(2단계)를 켭니다. AI 대화는 **Gemini · DeepSeek 등 무료 또는 유료 AI API 키**를 설정에서 연결하면 됩니다.
 
 상태 파일(설정·색인·아카이브)은 `~/FreedomFromSNS/`에 저장됩니다. 다음부터는 `ffs serve`로 실행하면 됩니다.
 
@@ -97,7 +97,7 @@ Four principles — **simplicity, speed, convenience, and a focus on your *own* 
 - **Categories** — All · Photos · Videos · Writing · Links · Reshares · Uncategorized.
 - **Full-screen gallery** — open one photo and swipe through the **whole category (thousands)**, not just the handful on a single post.
 - **Search** — instant **keyword search (no key)** plus meaning-based **semantic search** (optional).
-- **AI chat** — chat grounded in your *real* posts; it surfaces your actual photos and never invents URLs (optional, needs an AI key).
+- **AI chat** — chat grounded in your *real* posts; it surfaces your actual photos and never invents URLs (optional — needs a free or paid AI API key: Gemini, DeepSeek, etc.).
 - **Link previews · video posters · a lightbox scrubber** — cached to disk, fast.
 - **36 themes**, light/dark · **Korean & English** UI.
 - **Private by construction** — everything runs locally, the export is read-only, and you can hide or mark posts private (data is never deleted).
@@ -109,8 +109,8 @@ Each tier is optional and never blocks the one below it.
 | Tier | What | Needs |
 |---|---|---|
 | **0 — Your archive** | browse · filter · timeline · **keyword search** | nothing (no key, no download) |
-| **1 — Smart search** | meaning-based / semantic search | in-app opt-in: a one-time local model (no key) **or** a free key |
-| **2 — Chat with your archive** | talk to your own posts | an AI connection (free Google key or your own) |
+| **1 — Smart search** | meaning-based / semantic search | in-app opt-in: a one-time local model (no key) **or** a free AI API key (e.g. Gemini) |
+| **2 — Chat with your archive** | talk to your own posts | an AI API key — free or paid (Gemini, DeepSeek, etc.) |
 
 ## Install
 
@@ -131,7 +131,7 @@ curl -fsSL https://raw.githubusercontent.com/definekorea/freedomfromsns/master/i
 
 1. **Get your data** — Facebook → Settings → Your Information → *Download Your Information* → format **JSON** → **Posts**, then unzip it.
 2. **Run the install command** above. The wizard asks your **language (English / 한국어)**, **auto-locates** your export in your Downloads, builds your timeline, and opens the browser at `http://localhost:8282`. Browsing and keyword search work immediately, no key.
-3. **(Optional) Turn on more** — enable *Smart search* (Tier 1) or *Chat* (Tier 2) from inside the app whenever you want.
+3. **(Optional) Turn on more** — enable *Smart search* (Tier 1) or *Chat* (Tier 2) from inside the app whenever you want. Chat connects a **free or paid AI API key (Gemini, DeepSeek, etc.)** in Settings.
 
 State (config, index, archive) lives in `~/FreedomFromSNS/`. From then on, just run `ffs serve`.
 
