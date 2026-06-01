@@ -24,24 +24,17 @@ from urllib.parse import quote
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from .embed import gemini_key
+from . import providers
 
-# Gemini chat — the two UI-selectable tiers. Embeddings are fixed elsewhere
-# (gemini-embedding-001); this is the synthesis model only.
-#   • fast    = gemini-flash-latest (auto-tracks the newest Flash), thinking OFF
-#               → snappy + cheap.
-#   • precise = gemini-3.5-flash WITH thinking → near-Pro quality at Flash cost.
-_GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
-FAST_MODEL = "gemini-flash-latest"
-PRECISE_MODEL = "gemini-3.5-flash"          # a thinking model
-ALLOWED_MODELS = (FAST_MODEL, PRECISE_MODEL)
-DEFAULT_MODEL = os.environ.get("FFS_CHAT_MODEL", FAST_MODEL)
+# Chat model lanes are now provider-driven (see providers.py + settings); the
+# Gemini agent lane (ffs_agent) still uses lane_generation_config for thinking.
+PRECISE_MODEL = "gemini-3.5-flash"          # the Gemini thinking model (agent lane)
 
 
 def lane_generation_config(model: str, temperature: float) -> dict:
-    """Per-lane generationConfig. The precise lane keeps thinking and gets a
-    bigger output budget so a reasoned answer doesn't truncate; every other lane
-    disables thinking (thinkingBudget 0) to stay fast + cheap."""
+    """Per-lane generationConfig for the native-Gemini agent lane. The precise
+    (thinking) model keeps reasoning + a bigger budget so answers don't truncate;
+    the fast lane disables thinking (thinkingBudget 0)."""
     if model == PRECISE_MODEL:
         return {"temperature": temperature, "maxOutputTokens": 8192}
     return {"temperature": temperature, "maxOutputTokens": 4096,
@@ -152,33 +145,6 @@ def _media_of(body: str, post_id: str, title: str) -> list[dict]:
     return items
 
 
-def _gemini_chat(messages: list[dict], system: str, model: str, key: str,
-                 max_tokens: int = 4096) -> str:
-    """One Gemini generateContent call. `messages` is the OpenAI-style dialogue
-    (user/assistant); the retrieval context lives in `system`."""
-    contents = []
-    for m in messages:
-        c = (m.get("content") or "").strip()
-        if not c:
-            continue
-        contents.append({"role": "model" if m.get("role") == "assistant" else "user",
-                         "parts": [{"text": c}]})
-    if not contents:
-        contents = [{"role": "user", "parts": [{"text": "안녕하세요"}]}]
-    body = json.dumps({
-        "systemInstruction": {"parts": [{"text": system}]},
-        "contents": contents,
-        "generationConfig": lane_generation_config(model, 0.5),
-    }).encode()
-    url = _GEMINI_URL.format(model=model, key=key)
-    req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=120) as r:
-        data = json.loads(r.read())
-    cand = (data.get("candidates") or [{}])[0]
-    parts = (cand.get("content") or {}).get("parts") or []
-    return "".join(p.get("text", "") for p in parts).strip()
-
-
 def _chat(b, messages: list[dict], model: str) -> dict:
     """RAG: semantic-retrieve over the user's own archive → Gemini synthesis,
     returning {answer, sources, media, model}. `b` is the SpacesBackend."""
@@ -248,7 +214,7 @@ def _chat(b, messages: list[dict], model: str) -> dict:
     system += ("[내 기록 발췌]\n" + "\n---\n".join(ctx)) if ctx else "[내 기록 발췌] (관련 기록을 찾지 못했습니다.)"
 
     try:
-        answer = _gemini_chat(messages, system, model, gemini_key())
+        answer = providers.chat_complete(messages, system, model)  # active provider (settings)
     except Exception as e:  # noqa: BLE001
         return {"answer": f"지금은 답변을 생성하지 못했습니다. ({str(e)[:120]})",
                 "sources": sources, "media": flat, "model": model}
@@ -390,12 +356,66 @@ def register(app: FastAPI, b) -> None:
         messages = (body or {}).get("messages")
         if not isinstance(messages, list) or not messages:
             return JSONResponse({"error": "empty"}, status_code=400)
-        model = str((body or {}).get("model") or DEFAULT_MODEL)
-        if model not in ALLOWED_MODELS:
-            model = DEFAULT_MODEL
+        # models are the active provider's two lanes (settings); fall back to fast
+        st = providers.load_settings()
+        allowed = (st["chat"].get("fast_model"), st["chat"].get("precise_model"))
+        model = str((body or {}).get("model") or allowed[0])
+        if model not in allowed:
+            model = allowed[0]
         clean = [{"role": m.get("role"), "content": str(m.get("content", ""))}
                  for m in messages[-12:] if isinstance(m, dict)]
-        if (body or {}).get("agent"):  # agentic: Gemini drives its own tool loop
+        # the agentic tool loop is Gemini-native; for other providers fall back to RAG
+        if (body or {}).get("agent") and st["chat"].get("provider") == "gemini":
             from .ffs_agent import agent_chat
             return JSONResponse(agent_chat(b, clean, model))
-        return JSONResponse(_chat(b, clean, model))  # fast one-shot RAG
+        return JSONResponse(_chat(b, clean, model))  # one-shot RAG (any provider)
+
+    @app.get("/api/settings")
+    def get_settings():
+        """Current provider/model choices + per-provider configured status. Never
+        returns key values — only whether each provider has a key."""
+        return JSONResponse({
+            "chat": providers.load_settings()["chat"],
+            "embedding": providers.load_settings()["embedding"],
+            "chat_providers": providers.provider_status(),
+            "embed_providers": providers.EMBED_PROVIDERS,
+        })
+
+    @app.post("/api/settings")
+    async def post_settings(request: Request):
+        """Save provider/model choices and any API keys. Body:
+        {chat:{provider,fast_model,precise_model}, embedding:{provider,model},
+         keys:{ENV_VAR:value, …}}. Keys are written to .env + applied live."""
+        try:
+            body = await request.json()
+        except Exception:  # noqa: BLE001
+            body = {}
+        for env_var, val in ((body or {}).get("keys") or {}).items():
+            if isinstance(env_var, str) and env_var:
+                providers.set_key(env_var, str(val or ""))
+        saved = providers.save_settings({k: (body or {}).get(k) for k in ("chat", "embedding")})
+        # embed.py reads these from .env on the next `ffs embed`. process=False so
+        # the live server keeps querying with the provider the corpus was built on.
+        emb = saved.get("embedding") or {}
+        if emb.get("provider"):
+            providers.set_key("FBBACKUP_EMBED_PROVIDER", emb["provider"], process=False)
+        if emb.get("model"):
+            providers.set_key("FBBACKUP_EMBED_MODEL", emb["model"], process=False)
+        return JSONResponse({"ok": True, "chat": saved["chat"], "embedding": saved["embedding"],
+                             "chat_providers": providers.provider_status()})
+
+    @app.post("/api/settings/test")
+    async def test_settings(request: Request):
+        """Live-test a chat provider+model+key. Body: {provider, model, key?}.
+        A key in the body is saved first so you can test before committing."""
+        try:
+            body = await request.json()
+        except Exception:  # noqa: BLE001
+            body = {}
+        provider = str((body or {}).get("provider") or "gemini")
+        cat = providers.CHAT_PROVIDERS.get(provider) or {}
+        if (body or {}).get("key") and cat.get("key_env"):
+            providers.set_key(cat["key_env"], str(body["key"]))
+        model = str((body or {}).get("model") or cat.get("fast") or "")
+        ok, detail = providers.test_chat(provider, model)
+        return JSONResponse({"ok": ok, "detail": detail})

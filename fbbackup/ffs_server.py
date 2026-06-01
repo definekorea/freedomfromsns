@@ -75,6 +75,14 @@ def create_app(spaces_root: Path, export_root: Path,
                 if isinstance(t, dict) and isinstance(t.get("tokens"), dict):
                     themes.append({"name": t.get("name") or f.stem, "tokens": t["tokens"]})
         html = html.replace("__FFS_THEMES__", json.dumps(themes))
+        # Chat models = the active provider's two lanes (settings.json), so the
+        # selector + default follow whatever provider the user connected.
+        from . import providers
+        chat = providers.load_settings()["chat"]
+        html = html.replace("__FFS_MODELS__",
+                            json.dumps([chat["fast_model"], chat["precise_model"]]))
+        html = html.replace("__FFS_DEFAULT_MODEL__", json.dumps(chat["fast_model"]))
+        html = html.replace("__FFS_CHAT_PROVIDER__", json.dumps(chat["provider"]))
         return html
 
     app.mount("/static", StaticFiles(directory=_VIEWER), name="static")

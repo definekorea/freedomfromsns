@@ -11,3 +11,4 @@ venv/
 embed.log
 serve.log
 nohup.out
+settings.json

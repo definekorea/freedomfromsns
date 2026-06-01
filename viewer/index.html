@@ -17,8 +17,9 @@
       logos: __FFS_LOGOS__,         // server-injected: emblems in viewer/logo-candidates/ (sorted)
       themes: __FFS_THEMES__,       // server-injected: viewer/themes/*.json (sorted; 00-default first)
       site: "FreedomFromSNS",
-      models: ["gemini-flash-latest", "gemini-3.5-flash"],
-      defaultModel: "gemini-flash-latest"
+      models: __FFS_MODELS__,             // server-injected: the active provider's [fast, precise] (settings)
+      defaultModel: __FFS_DEFAULT_MODEL__,
+      chatProvider: __FFS_CHAT_PROVIDER__
     };
   </script>
   <script>

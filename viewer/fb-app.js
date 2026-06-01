@@ -36,6 +36,13 @@
       chat_eg1: "내가 올린 여행 사진들 보여줘", chat_eg2: "내가 가장 많이 쓴 주제는?", chat_eg3: "2015년에 무슨 일이 있었지?",
       chat_ph: "메시지를 입력하세요…  (Enter 전송 · Shift+Enter 줄바꿈)",
       send: "전송", ai_model: "AI 모델", model_fast: "빠름", model_precise: "정밀 (사고)",
+      settings: "설정", set_chat: "AI 대화 (채팅 모델)", set_chat_hint: "보유한 AI를 연결하세요 — 무료 키, 유료 키, 또는 로컬 모델.",
+      set_provider: "제공자", set_fast: "빠름 모델", set_precise: "정밀 모델", set_key: "API 키",
+      set_key_set: "(키 설정됨 — 바꾸려면 새로 입력)", set_key_ph: "API 키를 붙여넣으세요", set_get_key: "키 발급:", set_no_key: "키가 필요 없습니다 (로컬).",
+      set_test: "연결 테스트", set_testing: "테스트 중…", set_embed: "의미 검색 (임베딩)",
+      set_embed_hint: "검색·대화의 근거가 되는 임베딩 제공자입니다. Gemini 무료 키를 권장합니다 (다운로드 없음); 키 없이 로컬(오프라인)도 가능합니다.",
+      set_model: "모델", set_embed_note: "임베딩을 바꾸면 다시 만들어야 합니다: 터미널에서 `ffs embed` 실행.",
+      set_save: "저장", set_saving: "저장 중…", set_saved: "저장됨 ✓ — 새로고침합니다", set_err: "오류가 발생했습니다.",
       tools: "🔧 도구", tools_title: "도구 사용(에이전트) — 기록을 직접 검색·열람해 더 정확히 답합니다",
       clear_chat: "대화 지우기", sources: "근거 글",
       copy: "복사", copied: "복사됨", copy_title: "답변 복사", regen: "다시", regen_title: "다시 생성",
@@ -62,6 +69,13 @@
       chat_eg1: "Show my travel photos", chat_eg2: "What did I write about most?", chat_eg3: "What happened in 2015?",
       chat_ph: "Type a message…  (Enter to send · Shift+Enter for a new line)",
       send: "Send", ai_model: "AI model", model_fast: "Fast", model_precise: "Precise (thinking)",
+      settings: "Settings", set_chat: "AI chat (chat model)", set_chat_hint: "Connect any AI you have — a free key, a paid key, or a local model.",
+      set_provider: "Provider", set_fast: "Fast model", set_precise: "Precise model", set_key: "API key",
+      set_key_set: "(key set — type a new one to change)", set_key_ph: "Paste your API key", set_get_key: "Get a key:", set_no_key: "No key needed (local).",
+      set_test: "Test connection", set_testing: "Testing…", set_embed: "Semantic search (embeddings)",
+      set_embed_hint: "The embedding provider behind search + chat grounding. A free Gemini key is recommended (no download); fully offline local works with no key.",
+      set_model: "Model", set_embed_note: "Changing embeddings needs a rebuild: run `ffs embed` in a terminal.",
+      set_save: "Save", set_saving: "Saving…", set_saved: "Saved ✓ — reloading", set_err: "Something went wrong.",
       tools: "🔧 Tools", tools_title: "Agent mode — searches and opens your posts directly for more accurate answers",
       clear_chat: "Clear chat", sources: "Sources",
       copy: "Copy", copied: "Copied", copy_title: "Copy answer", regen: "Retry", regen_title: "Regenerate",
@@ -228,7 +242,7 @@
   function renderFilters() {
     els.filters.innerHTML = "";
     els.count = null;
-    if (S.view !== "chat") {
+    if (S.view !== "chat" && S.view !== "settings") {
       // Two groups: shown-by-default content, then a divider, then "click-into"
       // buckets (링크/공유/미분류) that are hidden from 전체 — you open them on demand.
       function chip(t, sec) {
@@ -259,7 +273,10 @@
       selBtn.onclick = toggleSelMode;
       els.filters.appendChild(selBtn);
     }
-    if (S.view !== "chat") { els.count = el("div", "fb-count"); els.filters.appendChild(els.count); }
+    if (S.view !== "chat" && S.view !== "settings") { els.count = el("div", "fb-count"); els.filters.appendChild(els.count); }
+    var gear = el("button", "fb-theme" + (S.view === "settings" ? " on" : ""), "⚙"); gear.title = tr("settings");
+    gear.onclick = function () { location.hash = "#settings"; };
+    els.filters.appendChild(gear);
     // theme cycler — instant repaint via :root tokens (a swatch of the accent)
     var themeBtn = el("button", "fb-theme"); els.themeBtn = themeBtn;
     themeBtn.title = tr("theme") + ": " + THEMES()[S.theme % THEMES().length].name;
@@ -339,6 +356,7 @@
     renderFilters();                     // bar persists across all views
     if (S.view === "calendar") renderCalendar();
     else if (S.view === "chat") renderChat();   // chat self-restores its log scroll
+    else if (S.view === "settings") renderSettings();
     else renderBrowse();
     if (entering) {
       S._rendered = S.view;
@@ -355,15 +373,15 @@
     var eq = h.indexOf("="), view = eq >= 0 ? h.slice(0, eq) : h;
     var q = "";
     if (eq >= 0) { try { q = decodeURIComponent(h.slice(eq + 1)); } catch (e) { q = h.slice(eq + 1); } }
-    var nextView = (view === "calendar") ? "calendar" : (view === "chat" && CFG.chat) ? "chat" : "browse";
+    var nextView = (view === "calendar") ? "calendar" : (view === "settings") ? "settings"
+      : (view === "chat" && CFG.chat) ? "chat" : "browse";
     if (nextView !== S.view) saveScroll();   // remember where we were before leaving
     S.view = nextView;
     els.tabBrowse.classList.toggle("on", S.view === "browse");
     els.tabCal.classList.toggle("on", S.view === "calendar");
     if (els.tabChat) els.tabChat.classList.toggle("on", S.view === "chat");
-    // sync the search state to the URL (so back/forward restores it cleanly).
-    // Chat carries no query — leave the search bar untouched while in it.
-    if (S.view !== "chat" && q !== S.q) {
+    // settings/chat carry no query — leave the search bar untouched in them.
+    if (S.view !== "chat" && S.view !== "settings" && q !== S.q) {
       S.q = q; S.semanticIds = null; S.shown = PAGE; var token = ++S.searchToken;
       if (els.q) els.q.value = q;
       if (q && q.length >= 2 && CFG.search) { S.semanticLoading = true; fireSemantic(q, token); }
@@ -1013,9 +1031,6 @@
   }
   /* ── AI chat (multi-turn, archive-grounded RAG; Gemini) ───────────────── */
   var CHAT_KEY = "ffs.chat.v1";
-  // Both lanes are Flash now, so map by id: 3.5-flash = the thinking "precise"
-  // lane, everything else (flash-latest) = the fast lane.
-  function modelLabel(m) { return /3\.5-flash/.test(m) ? tr("model_precise") : (/pro/i.test(m) ? tr("model_precise") : tr("model_fast")); }
   function loadChat() { try { S.chat = JSON.parse(sessionStorage.getItem(CHAT_KEY) || "[]") || []; } catch (e) { S.chat = []; } }
   function saveChat() { try { sessionStorage.setItem(CHAT_KEY, JSON.stringify(S.chat.slice(-20))); } catch (e) { /* quota */ } }
 
@@ -1051,10 +1066,12 @@
     els.chatSend = el("button", "fb-chat-send"); els.chatSend.innerHTML = "↑"; els.chatSend.title = tr("send"); els.chatSend.onclick = sendChat;
     comp.appendChild(els.chatInput); comp.appendChild(els.chatSend);
     // model selector (Gemini flash ⇄ pro), persisted; sent with each chat turn.
-    var models = CFG.models && CFG.models.length ? CFG.models : ["gemini-2.5-flash"];
+    var models = CFG.models && CFG.models.length ? CFG.models : ["gemini-flash-latest"];
     if (models.length > 1) {
       var msel = el("select", "fb-chat-model"); msel.title = tr("ai_model");
-      models.forEach(function (m) { msel.appendChild(new Option(modelLabel(m), m)); });
+      // label by lane (0 = fast, 1 = precise) — the model ids are provider-specific
+      models.forEach(function (m, i) { msel.appendChild(new Option(i === 0 ? tr("model_fast") : tr("model_precise"), m)); });
+      if (models.indexOf(S.model) < 0) S.model = models[0];   // stale id from another provider → reset
       msel.value = S.model; if (msel.value !== S.model) { S.model = msel.value; }
       msel.onchange = function () { S.model = msel.value; try { localStorage.setItem("ffs.model", S.model); } catch (e) {} };
       comp.appendChild(msel);
@@ -1070,6 +1087,88 @@
     els.main.appendChild(wrap);
     requestAnimationFrame(restoreChatScroll);   // land back where you left the chat
     setTimeout(function () { if (els.chatInput) els.chatInput.focus(); }, 30);
+  }
+
+  /* ── settings page: connect any AI you have (chat provider + embeddings) ──── */
+  function _setField(label, value, type) {
+    var w = el("div", "fb-set-field");
+    w.appendChild(el("label", "fb-set-label", label));
+    var i = el("input"); i.type = type || "text"; i.value = value || ""; i.className = "fb-set-input";
+    w.appendChild(i); w.input = i; return w;
+  }
+  function renderSettings() {
+    els.main.innerHTML = "";
+    var wrap = el("div", "fb-settings");
+    wrap.appendChild(el("h2", "fb-set-h", tr("settings")));
+    var status = el("div", "fb-set-status");
+    function setStatus(msg, cls) { status.textContent = msg || ""; status.className = "fb-set-status" + (cls ? " " + cls : ""); }
+
+    fetch("/api/settings").then(function (r) { return r.json(); }).then(function (d) {
+      var CP = d.chat_providers || {};
+      // ── Chat AI ──────────────────────────────────────────────────────────
+      var cs = el("div", "fb-set-sec");
+      cs.appendChild(el("div", "fb-set-sech", tr("set_chat")));
+      cs.appendChild(el("div", "fb-set-sub", tr("set_chat_hint")));
+      var prov = el("select", "fb-set-input");
+      Object.keys(CP).forEach(function (pid) { prov.appendChild(new Option(CP[pid].label + (CP[pid].configured ? "  ✓" : ""), pid)); });
+      prov.value = d.chat.provider;
+      var provW = el("div", "fb-set-field"); provW.appendChild(el("label", "fb-set-label", tr("set_provider"))); provW.appendChild(prov);
+      var fast = _setField(tr("set_fast"), d.chat.fast_model);
+      var prec = _setField(tr("set_precise"), d.chat.precise_model);
+      var key = _setField(tr("set_key"), "", "password");
+      var keyHint = el("div", "fb-set-keyhint");
+      var testBtn = el("button", "fb-set-btn", tr("set_test"));
+      function syncProv() {
+        var p = CP[prov.value] || {};
+        fast.input.value = p.fast || ""; prec.input.value = p.precise || "";
+        key.input.value = ""; key.input.placeholder = p.configured ? tr("set_key_set") : tr("set_key_ph");
+        key.style.display = p.key_env ? "" : "none";
+        keyHint.innerHTML = p.signup ? (tr("set_get_key") + ' <a href="' + p.signup + '" target="_blank" rel="noopener">' + p.key_env + ' ↗</a>') : tr("set_no_key");
+      }
+      prov.onchange = syncProv; syncProv();
+      testBtn.onclick = function () {
+        setStatus(tr("set_testing"));
+        fetch("/api/settings/test", { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ provider: prov.value, model: fast.input.value, key: key.input.value || undefined }) })
+          .then(function (r) { return r.json(); })
+          .then(function (res) { setStatus((res.ok ? "✓ " : "✗ ") + res.detail, res.ok ? "ok" : "err"); })
+          .catch(function () { setStatus("✗ " + tr("set_err"), "err"); });
+      };
+      [provW, fast, prec, key, keyHint, testBtn].forEach(function (x) { cs.appendChild(x); });
+      wrap.appendChild(cs);
+
+      // ── Semantic search (embeddings) ─────────────────────────────────────
+      var es = el("div", "fb-set-sec");
+      es.appendChild(el("div", "fb-set-sech", tr("set_embed")));
+      es.appendChild(el("div", "fb-set-sub", tr("set_embed_hint")));
+      var emb = el("select", "fb-set-input");
+      Object.keys(d.embed_providers || {}).forEach(function (pid) { emb.appendChild(new Option(d.embed_providers[pid].label, pid)); });
+      emb.value = d.embedding.provider;
+      var embW = el("div", "fb-set-field"); embW.appendChild(el("label", "fb-set-label", tr("set_provider"))); embW.appendChild(emb);
+      var embModel = _setField(tr("set_model"), d.embedding.model);
+      emb.onchange = function () { var p = (d.embed_providers || {})[emb.value] || {}; embModel.input.value = p.model || ""; };
+      es.appendChild(embW); es.appendChild(embModel);
+      es.appendChild(el("div", "fb-set-note", tr("set_embed_note")));
+      wrap.appendChild(es);
+
+      // ── Save ─────────────────────────────────────────────────────────────
+      var save = el("button", "fb-set-save", tr("set_save"));
+      save.onclick = function () {
+        var p = CP[prov.value] || {}; var keys = {};
+        if (p.key_env && key.input.value) keys[p.key_env] = key.input.value;
+        setStatus(tr("set_saving"));
+        fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat: { provider: prov.value, fast_model: fast.input.value, precise_model: prec.input.value },
+            embedding: { provider: emb.value, model: embModel.input.value }, keys: keys }) })
+          .then(function (r) { return r.json(); })
+          .then(function () { setStatus(tr("set_saved"), "ok"); setTimeout(function () { location.reload(); }, 700); })
+          .catch(function () { setStatus("✗ " + tr("set_err"), "err"); });
+      };
+      var bar = el("div", "fb-set-bar"); bar.appendChild(save); bar.appendChild(status);
+      wrap.appendChild(bar);
+    }).catch(function () { wrap.appendChild(el("div", "fb-empty", tr("set_err"))); });
+
+    els.main.appendChild(wrap);
   }
 
   function chatBubble(m) {

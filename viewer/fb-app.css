@@ -400,3 +400,26 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
 /* reactive: an image with no text fills the whole card */
 .fb-thumb.fill { aspect-ratio: auto; flex: 1; min-height: 220px; }
 .fb-thumb-date { position: absolute; bottom: .45rem; left: .6rem; font-size: .72rem; color: var(--fg-bright); text-shadow: 0 1px 4px rgba(var(--shadow-rgb),.9); z-index: 2; }
+
+/* ── settings page ────────────────────────────────────────────────────── */
+.fb-settings { max-width: 640px; margin: 0 auto; padding: .5rem .2rem 3rem; }
+.fb-set-h { font-family: var(--font-display); font-size: 1.9rem; letter-spacing: 1px; color: var(--gold); margin: .2rem 0 1.2rem; }
+.fb-set-sec { background: var(--bg2); border: 1px solid var(--line); border-radius: var(--rad); padding: 1.1rem 1.2rem; margin-bottom: 1.1rem; }
+.fb-set-sech { font-size: 1.05rem; font-weight: 700; color: var(--fg-bright); margin-bottom: .25rem; }
+.fb-set-sub { font-size: .84rem; color: var(--dim); line-height: 1.5; margin-bottom: 1rem; }
+.fb-set-field { margin-bottom: .8rem; }
+.fb-set-label { display: block; font-size: .75rem; color: var(--faint); text-transform: uppercase; letter-spacing: .5px; margin-bottom: .3rem; }
+.fb-set-input { width: 100%; background: var(--bg3); border: 1px solid var(--line); color: var(--txt); border-radius: 7px; padding: .5rem .65rem; font-size: .9rem; font-family: inherit; }
+.fb-set-input:focus { outline: none; border-color: var(--accent); }
+.fb-set-keyhint { font-size: .78rem; color: var(--faint); margin: -.4rem 0 .4rem; }
+.fb-set-keyhint a { color: var(--gold); text-decoration: underline; }
+.fb-set-note { font-size: .78rem; color: var(--faint); margin-top: .5rem; line-height: 1.5; }
+.fb-set-note code, .fb-set-sub code { background: var(--sunken); border: 1px solid var(--line); border-radius: 4px; padding: .05rem .35rem; }
+.fb-set-btn { background: var(--bg3); border: 1px solid var(--line); color: var(--dim); border-radius: 7px; padding: .45rem .9rem; font-size: .85rem; cursor: pointer; }
+.fb-set-btn:hover { color: var(--fg); border-color: var(--accent); }
+.fb-set-bar { display: flex; align-items: center; gap: 1rem; }
+.fb-set-save { background: var(--gold); color: var(--on-accent); border: none; border-radius: 8px; padding: .55rem 1.4rem; font-size: .92rem; font-weight: 700; cursor: pointer; }
+.fb-set-save:hover { filter: brightness(1.06); }
+.fb-set-status { font-size: .85rem; color: var(--dim); }
+.fb-set-status.ok { color: var(--green); }
+.fb-set-status.err { color: var(--red); }
