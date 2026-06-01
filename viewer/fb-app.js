@@ -20,6 +20,7 @@
       searching: "검색 중…", no_results: "결과가 없습니다.", no_results2: "결과 없음",
       close: "닫기", view_original: "원문 보기 ↗", loading: "불러오는 중…", prev: "이전", next: "다음",
       public: "공개", private: "비공개", privacy_hint: "공개 설정 — 비공개 글은 공유·내보내기에서 제외됩니다 (내 컴퓨터에서는 계속 보입니다)",
+      jump_latest: "최신으로 ↓",
       load_body_fail: "본문을 불러올 수 없습니다.", related: "관련 글", link_preview: "링크 미리보기…",
       source_fallback: "원본", lb_goto: "위치로 이동", original_short: "원문 ↗", untitled: "(무제)",
       chat_hi: "✦ 내 기록과 대화하기",
@@ -42,6 +43,7 @@
       searching: "Searching…", no_results: "No results.", no_results2: "No results",
       close: "Close", view_original: "View original ↗", loading: "Loading…", prev: "Previous", next: "Next",
       public: "Public", private: "Private", privacy_hint: "Privacy — private posts are excluded from sharing/export (still visible on your computer)",
+      jump_latest: "Jump to latest ↓",
       load_body_fail: "Couldn't load the post.", related: "Related", link_preview: "Link preview…",
       source_fallback: "Source", lb_goto: "Jump to position", original_short: "Original ↗", untitled: "(untitled)",
       chat_hi: "✦ Chat with my archive",
@@ -75,6 +77,8 @@
     semanticIds: null,          // semantic results for the current query (null = none/keyword)
     semanticLoading: false, searchToken: 0,
     ctx: null,                  // ordered post ids for detail prev/next (current context)
+    scroll: (function () { try { return JSON.parse(localStorage.getItem("ffs.scroll") || "{}") || {}; } catch (e) { return {}; } })(),
+    _rendered: null,            // last view actually rendered (for enter-restore)
     lang: (function () { try { return localStorage.getItem("ffs.lang") || (/^en/i.test(navigator.language || "") ? "en" : "ko"); } catch (e) { return "ko"; } })(),
     model: (function () { try { return localStorage.getItem("ffs.model") || (CFG.defaultModel || "gemini-2.5-flash"); } catch (e) { return CFG.defaultModel || "gemini-2.5-flash"; } })(),
     agent: (function () { try { var v = localStorage.getItem("ffs.agent"); return v === null ? true : v === "1"; } catch (e) { return true; } })(),
@@ -92,8 +96,14 @@
     S.cal = latest ? { y: +latest.slice(0, 4), m: +latest.slice(5, 7) } : { y: new Date().getFullYear(), m: 1 };
     if (CFG.related) fetch(CFG.related).then(function (r) { return r.json(); }).then(function (rel) { S.related = rel || {}; }).catch(function () {});
     loadChat();
+    // remember the last place: with no hash, reopen the last view the user left.
+    if (!location.hash) {
+      var lastView = ""; try { lastView = localStorage.getItem("ffs.view") || ""; } catch (e) {}
+      if (lastView === "calendar" || (lastView === "chat" && CFG.chat)) history.replaceState(null, "", "#" + lastView);
+    }
     routeFromHash();
     window.addEventListener("hashchange", routeFromHash);
+    installScrollPersistence();
   }).catch(function () { els.main.innerHTML = '<div class="fb-empty">' + tr("load_fail") + '</div>'; });
 
   /* ── chrome (header + filters) built once ───────────────────────────── */
@@ -186,15 +196,62 @@
   // pretext fit — no per-card reflow): short → large + filling, long → compact.
   function fitFont(len) { return len < 40 ? "1.5rem" : len < 90 ? "1.2rem" : len < 170 ? "1.05rem" : len < 280 ? ".92rem" : ".85rem"; }
 
+  /* ── scroll / last-place restore ────────────────────────────────────────
+     Browse + calendar scroll the window; chat scrolls its own log. Each view's
+     position is remembered (localStorage) and restored when you return — chat
+     especially, which lands back where you left the conversation. */
+  var BOTTOM = -1;  // sentinel: stick to the bottom (chat default)
+  function winEl() { return document.scrollingElement || document.documentElement; }
+  function isChatBottom() { var e = els.chatLog; return !e || (e.scrollHeight - e.scrollTop - e.clientHeight) < 80; }
+  function persistScroll() { try { localStorage.setItem("ffs.scroll", JSON.stringify(S.scroll)); } catch (e) {} }
+  function saveScroll() {
+    if (S.view === "chat") { if (els.chatLog) S.scroll.chat = isChatBottom() ? BOTTOM : els.chatLog.scrollTop; }
+    else { S.scroll[S.view] = winEl().scrollTop; }
+    persistScroll();
+  }
+  function restoreChatScroll() {
+    if (!els.chatLog) return;
+    var s = S.scroll.chat;
+    if (s == null || s === BOTTOM) scrollChat(); else els.chatLog.scrollTop = s;
+    updateChatPill();
+  }
+  function restoreWinScroll() {
+    var s = S.scroll[S.view];
+    winEl().scrollTop = (typeof s === "number" && s > 0) ? s : 0;
+  }
+  var _scrollDeb;
+  function installScrollPersistence() {
+    window.addEventListener("scroll", function () {
+      if (S.view === "chat") return;          // chat persists via its log listener
+      clearTimeout(_scrollDeb); _scrollDeb = setTimeout(saveScroll, 200);
+    }, { passive: true });
+    window.addEventListener("beforeunload", saveScroll);
+    document.addEventListener("visibilitychange", function () { if (document.visibilityState === "hidden") saveScroll(); });
+  }
+  function updateChatPill() { if (els.chatPill) els.chatPill.classList.toggle("on", !isChatBottom()); }
+  function anchorLastUser() {              // ChatGPT-style: new question rides to the top
+    if (!els.chatLog) return;
+    var me = els.chatLog.querySelectorAll(".fb-chat-msg.me");
+    var last = me[me.length - 1];
+    if (last) els.chatLog.scrollTop = Math.max(0, last.offsetTop - 12); else scrollChat();
+    updateChatPill();
+  }
+
   /* ── routing ────────────────────────────────────────────────────────── */
   //  Hash forms: #browse | #calendar | #chat | #post/<id> | #<view>=<query>.
   //  The search query lives in the URL so it's restorable + back/forward-safe;
   //  doSearch updates it with replaceState (no history pile-up per keystroke).
   function renderCurrentView() {
+    var entering = S.view !== S._rendered;
     renderFilters();                     // bar persists across all views
     if (S.view === "calendar") renderCalendar();
-    else if (S.view === "chat") renderChat();
+    else if (S.view === "chat") renderChat();   // chat self-restores its log scroll
     else renderBrowse();
+    if (entering) {
+      S._rendered = S.view;
+      try { localStorage.setItem("ffs.view", S.view); } catch (e) {}
+      if (S.view !== "chat") requestAnimationFrame(restoreWinScroll);
+    }
   }
   function routeFromHash() {
     if (!els.main) buildChrome();
@@ -204,7 +261,9 @@
     var eq = h.indexOf("="), view = eq >= 0 ? h.slice(0, eq) : h;
     var q = "";
     if (eq >= 0) { try { q = decodeURIComponent(h.slice(eq + 1)); } catch (e) { q = h.slice(eq + 1); } }
-    S.view = (view === "calendar") ? "calendar" : (view === "chat" && CFG.chat) ? "chat" : "browse";
+    var nextView = (view === "calendar") ? "calendar" : (view === "chat" && CFG.chat) ? "chat" : "browse";
+    if (nextView !== S.view) saveScroll();   // remember where we were before leaving
+    S.view = nextView;
     els.tabBrowse.classList.toggle("on", S.view === "browse");
     els.tabCal.classList.toggle("on", S.view === "calendar");
     if (els.tabChat) els.tabChat.classList.toggle("on", S.view === "chat");
@@ -784,7 +843,13 @@
     } else {
       S.chat.forEach(function (m) { log.appendChild(chatBubble(m)); });
     }
+    // persist + pill on scroll; "↓ latest" pill appears when scrolled up
+    var _logDeb;
+    log.addEventListener("scroll", function () { updateChatPill(); clearTimeout(_logDeb); _logDeb = setTimeout(saveScroll, 200); }, { passive: true });
     wrap.appendChild(log);
+    els.chatPill = el("button", "fb-chat-pill", "↓"); els.chatPill.title = tr("jump_latest");
+    els.chatPill.onclick = function () { scrollChat(); updateChatPill(); };
+    wrap.appendChild(els.chatPill);
 
     var comp = el("div", "fb-chat-composer");
     els.chatInput = el("textarea"); els.chatInput.placeholder = tr("chat_ph"); els.chatInput.rows = 1;
@@ -810,7 +875,7 @@
     if (S.chat.length) { var clr = el("button", "fb-chat-clear", tr("clear_chat")); clr.onclick = function () { S.chat = []; saveChat(); renderChat(); }; comp.appendChild(clr); }
     wrap.appendChild(comp);
     els.main.appendChild(wrap);
-    scrollChat();
+    requestAnimationFrame(restoreChatScroll);   // land back where you left the chat
     setTimeout(function () { if (els.chatInput) els.chatInput.focus(); }, 30);
   }
 
@@ -894,11 +959,18 @@
   // the bottom when one loads IF the user is already near the bottom (don't yank
   // them back if they've scrolled up to read).
   function chatImgLoaded() { if (els.chatLog && (els.chatLog.scrollHeight - els.chatLog.scrollTop - els.chatLog.clientHeight) < 160) scrollChat(); }
-  function redrawChat() {
+  // Rebuild the log. mode: "anchor" → ride the newest question to the top (so the
+  // answer renders below it); "bottom" → jump to bottom; default → keep position
+  // unless the user was already at the bottom (then follow). Predictable, no yank.
+  function redrawChat(mode) {
     if (!els.chatLog) { renderChat(); return; }
+    var prev = els.chatLog.scrollTop, wasBottom = isChatBottom();
     els.chatLog.innerHTML = "";
     S.chat.forEach(function (m) { els.chatLog.appendChild(chatBubble(m)); });
-    scrollChat();
+    if (mode === "anchor") anchorLastUser();
+    else if (mode === "bottom" || wasBottom) scrollChat();
+    else els.chatLog.scrollTop = prev;
+    updateChatPill();
   }
 
   function sendChat() {
@@ -908,7 +980,7 @@
     els.chatInput.value = ""; els.chatInput.style.height = "auto";
     S.chat.push({ role: "user", content: text });
     S.chat.push({ role: "bot", content: "", _pending: true });
-    redrawChat(); sendRequest();
+    redrawChat("anchor"); sendRequest();
   }
   // Sends the conversation and fills the trailing pending bot message. Shared by
   // sendChat (new turn) and regenMessage (re-ask the last question).

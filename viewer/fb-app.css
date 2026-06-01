@@ -165,8 +165,14 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
 /* ── AI chat tab ──────────────────────────────────────────────────────── */
 .fb-tab-ai { color: var(--gold); }
 .fb-tab-ai.on { color: #0a0a0a; background: var(--gold); }
-.fb-chat { max-width: 840px; margin: 0 auto; display: flex; flex-direction: column;
+.fb-chat { position: relative; max-width: 840px; margin: 0 auto; display: flex; flex-direction: column;
   height: calc(100vh - 140px); min-height: 380px; }
+.fb-chat-pill { position: absolute; left: 50%; bottom: 86px; transform: translateX(-50%) translateY(6px);
+  background: var(--bg3); color: var(--fg); border: 1px solid var(--line); border-radius: 999px;
+  width: 2.1rem; height: 2.1rem; font-size: 1rem; line-height: 1; box-shadow: 0 4px 14px rgba(0,0,0,.5);
+  opacity: 0; pointer-events: none; transition: opacity .15s, transform .15s; z-index: 4; cursor: pointer; }
+.fb-chat-pill.on { opacity: 1; pointer-events: auto; transform: translateX(-50%) translateY(0); }
+.fb-chat-pill:hover { border-color: var(--accent); }
 .fb-chat-log { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem; padding: .5rem .2rem 1rem; }
 .fb-chat-msg { display: flex; flex-direction: column; max-width: 92%; }
 .fb-chat-msg.me { align-self: flex-end; align-items: flex-end; }
