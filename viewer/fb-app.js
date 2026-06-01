@@ -7,7 +7,7 @@
 (function () {
   "use strict";
   var CFG = window.FFS || {};
-  var TYPE = { photo: "사진", video: "영상", link: "링크", status: "글", share: "공유" };
+  var TYPE = { photo: "사진", video: "영상", link: "링크", status: "글", share: "공유", uncat: "미분류" };
   var MON = "일월화수목금토".split("");
   var PAGE = 60;
 
@@ -81,7 +81,7 @@
   function renderFilters() {
     els.filters.innerHTML = "";
     if (S.view !== "browse") return;
-    ["all", "photo", "video", "link", "share", "status"].forEach(function (t) {
+    ["all", "photo", "video", "link", "share", "status", "uncat"].forEach(function (t) {
       var c = el("button", "fb-chip" + (S.type === t ? " on" : ""), t === "all" ? "전체" : TYPE[t]);
       c.dataset.t = t; c.onclick = function () { S.type = t; S.shown = PAGE; renderBrowse(); };
       els.filters.appendChild(c);
@@ -185,17 +185,22 @@
       base = S.posts.filter(function (p) { return !q || (p.title + " " + (p.excerpt || "")).toLowerCase().indexOf(q) >= 0; });
     }
     return base.filter(function (p) {
-      if (S.type !== "all" && p.type !== S.type) return false;
+      // 전체 = the post timeline only; loose media (미분류) is its own bucket.
+      if (S.type === "all") { if (p.type === "uncat") return false; }
+      else if (p.type !== S.type) return false;
       if (S.year !== "all" && p.date.slice(0, 4) !== S.year) return false;
       return true;
     });
   }
 
   function card(p) {
-    var c = el("div", "fb-card"); c.onclick = function () { openPost(p.id); };
+    // Uncategorized media are "just images" — clicking one opens the full-screen
+    // lightbox over the WHOLE 미분류 set so you can navigate them all with the
+    // thumbnail strip, instead of a text-less detail modal.
+    var c = el("div", "fb-card"); c.onclick = function () { if (p.type === "uncat") openUncatLightbox(p); else openPost(p.id); };
     var thumb;
     if (p.thumb) { thumb = el("div", "fb-thumb"); var im = el("img"); im.loading = "lazy"; im.src = p.thumb; im.onerror = function () { thumb.classList.add("ph"); thumb.dataset.ic = "▦"; im.remove(); }; thumb.appendChild(im); }
-    else { thumb = el("div", "fb-thumb ph"); thumb.dataset.ic = p.type === "video" ? "▶" : p.type === "link" ? "🔗" : p.type === "share" ? "↻" : "▦"; }
+    else { thumb = el("div", "fb-thumb ph"); thumb.dataset.ic = p.type === "video" || p.type === "uncat" ? "▶" : p.type === "link" ? "🔗" : p.type === "share" ? "↻" : "▦"; }
     var badge = el("div", "fb-badge " + p.type, TYPE[p.type] || "글"); thumb.appendChild(badge);
     c.appendChild(thumb);
     var body = el("div", "fb-body");
@@ -514,32 +519,61 @@
     lbRender(); renderLbThumbs();
   }
   function closeLightbox() { if (els.lb) { els.lb.classList.remove("on"); els.lbStage.innerHTML = ""; } document.body.style.overflow = ""; S.lb = null; }
-  function lbGo(d) { if (!S.lb) return; var n = S.lb.items.length; S.lb.i = (S.lb.i + d + n) % n; lbRender(); lbCenterThumb(); }
+  function lbGo(d) { if (!S.lb) return; var n = S.lb.items.length; S.lb.i = (S.lb.i + d + n) % n; lbRender(); lbAfterNav(); }
   function lbRender() {
     var it = S.lb.items[S.lb.i];
     els.lbStage.innerHTML = "";
     if (it.type === "video") { var v = el("video"); v.src = it.url; v.controls = true; v.autoplay = true; v.playsInline = true; els.lbStage.appendChild(v); }
     else { var im = el("img"); im.src = it.url; im.alt = it.post_title || ""; els.lbStage.appendChild(im); }
-    var href = it.post_url || (S.byId[String(it.post_id)] ? "#post/" + it.post_id : "");
+    var href = it.post_url || (it.post_id && S.byId[String(it.post_id)] ? "#post/" + it.post_id : "");
     if (href) { els.lbLink.href = href; els.lbLink.textContent = (it.post_title ? it.post_title.slice(0, 46) + "  " : "") + "원문 ↗"; els.lbLink.style.display = ""; }
     else els.lbLink.style.display = "none";
     els.lbCounter.textContent = (S.lb.i + 1) + " / " + S.lb.items.length;
-    // highlight active thumb
-    if (els.lbThumbs.children.length) {
-      for (var k = 0; k < els.lbThumbs.children.length; k++) els.lbThumbs.children[k].classList.toggle("on", k === S.lb.i);
-    }
+    lbHighlight();
   }
+  // The strip can hold thousands of items (the whole 미분류 set), so render only a
+  // WINDOW of thumbnails around the current image; slide it as you navigate.
+  var LB_WIN = 40;
   function renderLbThumbs() {
     els.lbThumbs.innerHTML = "";
-    S.lb.items.forEach(function (it, idx) {
-      var t = el("div", "fb-lb-thumb" + (it.type === "video" ? " vid" : "") + (idx === S.lb.i ? " on" : ""));
-      var im = el("img"); im.loading = "lazy"; im.src = it.url; im.onerror = function () { t.classList.add("err"); }; t.appendChild(im);
-      t.onclick = function () { S.lb.i = idx; lbRender(); lbCenterThumb(); };
+    if (!S.lb) return;
+    var n = S.lb.items.length, i = S.lb.i;
+    var start = Math.max(0, i - LB_WIN), end = Math.min(n, i + LB_WIN + 1);
+    S.lb.winStart = start; S.lb.winEnd = end;
+    for (var k = start; k < end; k++) {
+      var it = S.lb.items[k];
+      var t = el("div", "fb-lb-thumb" + (it.type === "video" ? " vid" : "") + (k === i ? " on" : ""));
+      t.dataset.idx = k;
+      var im = el("img"); im.loading = "lazy"; im.src = it.thumb || it.url;
+      im.onerror = (function (tt) { return function () { tt.classList.add("err"); }; })(t);
+      t.appendChild(im);
+      t.onclick = (function (idx) { return function () { S.lb.i = idx; lbRender(); lbAfterNav(); }; })(k);
       els.lbThumbs.appendChild(t);
-    });
+    }
     lbCenterThumb();
   }
-  function lbCenterThumb() { var c = els.lbThumbs.children[S.lb.i]; if (c) c.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" }); }
+  function lbHighlight() { var kids = els.lbThumbs.children; for (var k = 0; k < kids.length; k++) kids[k].classList.toggle("on", +kids[k].dataset.idx === S.lb.i); }
+  function lbAfterNav() {
+    if (!S.lb) return;
+    // re-window near an edge (or after a thumb jump out of range); else just recenter
+    if (S.lb.i < S.lb.winStart + 5 || S.lb.i >= S.lb.winEnd - 5) renderLbThumbs();
+    else { lbHighlight(); lbCenterThumb(); }
+  }
+  function lbCenterThumb() { var kids = els.lbThumbs.children; for (var k = 0; k < kids.length; k++) if (+kids[k].dataset.idx === S.lb.i) { kids[k].scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" }); return; } }
+  // Clicking an uncategorized image opens the whole 미분류 set in the lightbox so
+  // you can flip through them all; a loose video (no thumb) opens its detail (plays).
+  function fullImg(t) { return (t || "").replace(/&w=\d+$/, ""); }
+  function openUncatLightbox(clicked) {
+    if (!clicked.thumb) { openPost(clicked.id); return; }
+    var list = filtered().filter(function (p) { return p.type === "uncat" && p.thumb; });
+    var items = [], startIdx = 0;
+    for (var i = 0; i < list.length; i++) {
+      var p = list[i];
+      if (p.id === clicked.id) startIdx = items.length;
+      items.push({ url: fullImg(p.thumb), thumb: p.thumb, type: "image", post_title: p.title || "" });
+    }
+    openLightbox(items, startIdx);
+  }
   function enableGrabScroll(elm) {
     var down = false, startX, startL;
     elm.addEventListener("mousedown", function (e) { down = true; startX = e.pageX; startL = elm.scrollLeft; elm.classList.add("grabbing"); });

@@ -305,17 +305,20 @@ def parse(export_root: Path, out_dir: Path) -> dict:
             for raw in json.load(fh):
                 records.append(normalize_post(raw, subfolders, by_name, share_links, fbid_ts, fbid_tx))
 
-    # Ingest media that lives outside posts (albums, uncategorized photos, videos)
-    # as synthetic posts, deduped against media already referenced by a post; then
-    # tag every record whose media belongs to a named album.
+    # Loose media (uncategorized photos / videos / album photos NOT in any post)
+    # is ingested as type="uncat" so it lives in its own 미분류 bucket instead of
+    # fragmenting the post timeline; album membership also tags the real posts so
+    # "Cambodia" finds the whole album.
     from .media_extra import album_map, apply_albums, extra_media_posts
     seen = {os.path.basename(m["uri"]) for r in records for m in r["media"] if m["uri"]}
     amap: dict[str, str] = {}
+    loose: list[dict] = []
     for posts_dir in {pf.parent for pf in posts_files}:
-        records.extend(extra_media_posts(posts_dir, seen, lambda u: _resolve(u, subfolders, by_name)))
+        loose.extend(extra_media_posts(posts_dir, seen, lambda u: _resolve(u, subfolders, by_name)))
         amap.update(album_map(posts_dir))
+    records.extend(loose)
     tagged = apply_albums(records, amap)
-    print(f"  + {len(seen)} media files; {tagged} posts tagged with an album", flush=True)
+    print(f"  {len(loose)} loose media → 미분류; {tagged} posts tagged with an album", flush=True)
 
     records.sort(key=lambda r: r["timestamp"], reverse=True)
 

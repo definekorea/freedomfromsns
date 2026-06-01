@@ -57,7 +57,7 @@ def album_map(posts_dir: Path) -> dict[str, str]:
     return out
 
 
-def _record(item: dict, kind: str, resolve, source: str) -> dict | None:
+def _record(item: dict, kind: str, resolve, source: str, album: str = "") -> dict | None:
     uri = item.get("uri", "")
     if not uri:
         return None
@@ -68,8 +68,12 @@ def _record(item: dict, kind: str, resolve, source: str) -> dict | None:
         "fb_id": hashlib.sha1(uri.encode()).hexdigest()[:16],
         "timestamp": ts,
         "datetime": datetime.fromtimestamp(ts).isoformat() if ts else "",
-        "type": "video" if kind == "video" else "photo",
-        "title": cap,
+        # "uncat" (미분류) — loose media not in any post. A distinct type so the
+        # viewer keeps these OUT of the main post timeline (전체) and shows them in
+        # their own 미분류 bucket. The media KIND (image/video) is preserved below
+        # so the lightbox/detail still renders/plays them correctly.
+        "type": "uncat",
+        "title": cap or album,
         "group": None,
         "text": cap,
         "hashtags": [],
@@ -94,14 +98,14 @@ def extra_media_posts(posts_dir: Path, seen: set[str], resolve) -> list[dict]:
     mutated so the three sources don't duplicate each other either."""
     recs: list[dict] = []
 
-    def take(items, kind, source):
+    def take(items, kind, source, album=""):
         for it in items:
             if not isinstance(it, dict):
                 continue
             b = _base(it.get("uri"))
             if not b or b in seen:
                 continue
-            r = _record(it, kind, resolve, source)
+            r = _record(it, kind, resolve, source, album)
             if r:
                 seen.add(b)
                 recs.append(r)
@@ -113,7 +117,7 @@ def extra_media_posts(posts_dir: Path, seen: set[str], resolve) -> list[dict]:
                 d = json.load(open(af, encoding="utf-8"))
             except Exception:
                 continue
-            take(d.get("photos", []) or [], "image", "facebook-album")
+            take(d.get("photos", []) or [], "image", "facebook-album", fix(d.get("name", "")) or "")
     f = posts_dir / "your_uncategorized_photos.json"
     if f.is_file():
         try:
