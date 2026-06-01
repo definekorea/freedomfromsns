@@ -1,20 +1,19 @@
 [project]
 name = "freedomfromsns"
-version = "0.1.5"
+version = "0.1.6"
 description = "FreedomFromSNS — browse, search, and chat with your Facebook archive, locally. Gemini-powered."
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.110",
     "uvicorn>=0.29",
     "pyyaml>=6.0",
-    "numpy>=1.24",  # embed() normalizes/saves vectors unconditionally
+    "numpy>=1.24",          # embed() normalizes/saves vectors unconditionally
+    "imageio-ffmpeg>=0.5",  # bundled static ffmpeg → video poster-frame thumbnails work
+                            # everywhere (no system ffmpeg); spaces_backend prefers a
+                            # system ffmpeg and falls back to this.
 ]
 
 [project.optional-dependencies]
-# Video poster-frame thumbnails without a system ffmpeg install. Bundles a
-# static ffmpeg per-OS (~60 MB); spaces_backend prefers a system ffmpeg and
-# falls back to this. Frictionless video thumbs on native Windows/macOS.
-media = ["imageio-ffmpeg>=0.5"]
 # Local, no-key embeddings on CPU (fastembed/ONNX). Remote providers
 # (gemini / apicascade) need neither — they're pure HTTP.
 local = ["fastembed>=0.3"]

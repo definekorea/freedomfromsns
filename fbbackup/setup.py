@@ -84,6 +84,8 @@ STRINGS: dict[str, dict[str, str]] = {
                       "`cloudflared --config {cfg} service install`.",
         "opening":   "Opening your archive at {url} …",
         "shortcut_made": "Created a launcher: {path}\n  Double-click it any time to reopen your archive.",
+        "autostart_offer": "Start FreedomFromSNS automatically when you log in? [y/N]: ",
+        "autostart_on": "Auto-start at login is ON.",
         "lang_prompt": "Language / 언어 — [1] English  [2] 한국어 (default {d}): ",
         "no_posts":  "No posts found in that export. Make sure you downloaded "
                      "*Posts* in *JSON* format from Facebook, then unzipped it.",
@@ -159,6 +161,8 @@ STRINGS: dict[str, dict[str, str]] = {
                       "`cloudflared --config {cfg} service install`.",
         "opening":   "{url} 에서 기록을 엽니다…",
         "shortcut_made": "바로가기를 만들었습니다: {path}\n  더블클릭하면 언제든 기록을 다시 열 수 있어요.",
+        "autostart_offer": "로그인할 때 FreedomFromSNS를 자동으로 시작할까요? [y/N]: ",
+        "autostart_on": "로그인 시 자동 시작이 켜졌습니다.",
         "lang_prompt": "Language / 언어 — [1] English  [2] 한국어 (기본 {d}): ",
         "no_posts":  "그 내보내기에서 게시물을 찾지 못했습니다. 페이스북에서 "
                      "*게시물*을 *JSON* 형식으로 받아 압축을 풀었는지 확인하세요.",
@@ -582,6 +586,94 @@ def create_launcher(home: Path, name: str = "FreedomFromSNS", cli: str = "serve 
         return f
     except Exception:  # noqa: BLE001
         return None
+
+
+def _startup_dir() -> Path | None:
+    if os.name == "nt":
+        ad = os.environ.get("APPDATA")
+        if ad:
+            d = Path(ad) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup"
+            if d.is_dir():
+                return d
+    return None
+
+
+def enable_autostart(home: Path) -> Path | None:
+    """Start the server at login (background, no window). Returns the entry path."""
+    py = sys.executable
+    try:
+        if os.name == "nt":
+            sd = _startup_dir()
+            if not sd:
+                return None
+            pyw = Path(py).with_name("pythonw.exe")          # windowless on Windows
+            runner = str(pyw if pyw.exists() else py)
+            cmd = home / "ffs-server.cmd"
+            cmd.write_text("@echo off\r\n"
+                           f'set "FBBACKUP_HOME={home}"\r\n'
+                           f'"{runner}" -m fbbackup.cli serve\r\n', encoding="utf-8")
+            vbs = sd / "FreedomFromSNS.vbs"                   # runs the .cmd hidden at login
+            vbs.write_text(f'CreateObject("WScript.Shell").Run """{cmd}""", 0, False\r\n', encoding="utf-8")
+            return vbs
+        if sys.platform == "darwin":
+            la = Path.home() / "Library" / "LaunchAgents"
+            la.mkdir(parents=True, exist_ok=True)
+            p = la / "com.freedomfromsns.plist"
+            p.write_text(
+                '<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0"><dict>\n'
+                '  <key>Label</key><string>com.freedomfromsns</string>\n'
+                f'  <key>ProgramArguments</key><array><string>{py}</string><string>-m</string>'
+                '<string>fbbackup.cli</string><string>serve</string></array>\n'
+                f'  <key>EnvironmentVariables</key><dict><key>FBBACKUP_HOME</key><string>{home}</string></dict>\n'
+                '  <key>RunAtLoad</key><true/>\n</dict></plist>\n', encoding="utf-8")
+            import subprocess
+            try:
+                subprocess.run(["launchctl", "load", str(p)], timeout=10)
+            except Exception:  # noqa: BLE001
+                pass
+            return p
+        ad = Path.home() / ".config" / "autostart"           # Linux XDG autostart
+        ad.mkdir(parents=True, exist_ok=True)
+        f = ad / "freedomfromsns.desktop"
+        f.write_text("[Desktop Entry]\nType=Application\nName=FreedomFromSNS\n"
+                     f'Exec=sh -c \'FBBACKUP_HOME="{home}" "{py}" -m fbbackup.cli serve\'\n'
+                     "X-GNOME-Autostart-enabled=true\n", encoding="utf-8")
+        return f
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def disable_autostart() -> bool:
+    try:
+        p = None
+        if os.name == "nt":
+            sd = _startup_dir()
+            p = (sd / "FreedomFromSNS.vbs") if sd else None
+        elif sys.platform == "darwin":
+            p = Path.home() / "Library" / "LaunchAgents" / "com.freedomfromsns.plist"
+            if p.exists():
+                import subprocess
+                try:
+                    subprocess.run(["launchctl", "unload", str(p)], timeout=10)
+                except Exception:  # noqa: BLE001
+                    pass
+        else:
+            p = Path.home() / ".config" / "autostart" / "freedomfromsns.desktop"
+        if p and p.exists():
+            p.unlink()
+            return True
+    except Exception:  # noqa: BLE001
+        pass
+    return False
+
+
+def autostart_status() -> bool:
+    if os.name == "nt":
+        sd = _startup_dir()
+        return bool(sd and (sd / "FreedomFromSNS.vbs").exists())
+    if sys.platform == "darwin":
+        return (Path.home() / "Library" / "LaunchAgents" / "com.freedomfromsns.plist").exists()
+    return (Path.home() / ".config" / "autostart" / "freedomfromsns.desktop").exists()
 
 
 def set_export_root(home: Path, root: Path) -> Path:

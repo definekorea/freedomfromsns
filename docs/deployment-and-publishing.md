@@ -350,6 +350,16 @@ Reordered around the §0.1 ladder: **ship Tier 0 the fastest, make AI an unlock.
     context/1024-dim models ruled out for CPU. Measured data in [`local-models.md`](local-models.md). (M) — done.
     *(Live-embed watchdog — switch mid-run if it stalls — is the remaining nice-to-have.)*
 12. **Mobile** — see the Mobile section below. (L)
+13. ✅ **One-click launch** — `ffs setup` drops a desktop launcher; `ffs serve` is
+    **idempotent** (if a server is already up it just opens the page, no port clash);
+    `ffs autostart on|off` runs the server at login (Win Startup `.vbs`/hidden,
+    mac LaunchAgent, Linux XDG). `imageio-ffmpeg` moved to **core** deps so video
+    poster thumbnails work on a clean install (no system ffmpeg). — done.
+14. **Tray icon** (control center) — a system-tray app (`pystray` + `Pillow`) that
+    runs the server in the background with a **color-coded status** (running / stopped
+    / published) and a click menu: Open archive · Publish on/off · Auto-start · Quit.
+    The desktop launcher + autostart would run `ffs tray`. Adds 2 deps + needs a
+    display to test; build as `ffs[tray]` or core. (M) 🔜 — the unified "one place".
 
 ---
 

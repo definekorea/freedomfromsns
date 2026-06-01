@@ -144,6 +144,17 @@ def cmd_index(args) -> int:
     return 0
 
 
+def _server_up(host: str, port: int) -> bool:
+    """Is a FreedomFromSNS server already answering on this port?"""
+    import urllib.request
+    h = "127.0.0.1" if host in ("0.0.0.0", "", "::", "::1") else host
+    try:
+        with urllib.request.urlopen(f"http://{h}:{port}/", timeout=2) as r:
+            return r.status == 200
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def cmd_serve(args) -> int:
     from fbbackup.ffs_server import serve
     p = _paths(args)
@@ -151,11 +162,19 @@ def cmd_serve(args) -> int:
     chat_model = (p["cfg"].get("gemini", {}) or {}).get("chat_model", "gemini-flash-latest")
     host = args.host or os.environ.get("FBBACKUP_HOST") or cfg_serve.get("host", "127.0.0.1")
     port = int(args.port or os.environ.get("FBBACKUP_PORT") or cfg_serve.get("port", 8282))
-    print(f"FreedomFromSNS → http://{host}:{port}  (chat: {chat_model}; Ctrl-C to stop)", flush=True)
+    url = f"http://{'127.0.0.1' if host in ('0.0.0.0', '', '::', '::1') else host}:{port}"
+    # Idempotent launch: if a server is already up (double-clicked the icon again),
+    # just open the page instead of failing to bind the port.
+    if not bool(getattr(args, "reload", False)) and _server_up(host, port):
+        import webbrowser
+        print(f"FreedomFromSNS is already running → {url}  (opening the page)", flush=True)
+        webbrowser.open(url)
+        return 0
+    print(f"FreedomFromSNS → {url}  (chat: {chat_model}; Ctrl-C to stop)", flush=True)
     if getattr(args, "open", False):
         import threading
         import webbrowser
-        threading.Timer(1.5, lambda: webbrowser.open(f"http://{host}:{port}")).start()
+        threading.Timer(1.5, lambda: webbrowser.open(url)).start()
     serve(p["spaces"], p["export"], host=host, port=port, chat_model=chat_model,
           reload=bool(getattr(args, "reload", False)))
     return 0
@@ -331,6 +350,13 @@ def cmd_setup(args) -> int:
         sc = wiz.create_launcher(home)
         if sc:
             say("shortcut_made", path=sc)
+        if not args.yes:                       # offer auto-start at login (default off)
+            try:
+                a = input(wiz.t(lang, "autostart_offer")).strip().lower()
+            except EOFError:
+                a = ""
+            if a in ("y", "yes", "예", "ㅇ") and wiz.enable_autostart(home):
+                say("autostart_on")
 
     # 5. Open the browser and serve (the wow moment).
     if args.no_serve:
@@ -347,6 +373,24 @@ def cmd_setup(args) -> int:
         import webbrowser
         threading.Timer(1.5, lambda: webbrowser.open(url)).start()  # after the server is up
     serve(p["spaces"], p["export"], host=host, port=port, chat_model=chat_model)
+    return 0
+
+
+def cmd_autostart(args) -> int:
+    """Turn auto-start-at-login on/off (or show status)."""
+    from fbbackup import setup as wiz
+    home = _home()
+    os.environ["FBBACKUP_HOME"] = str(home)
+    state = getattr(args, "state", "status")
+    if state == "on":
+        f = wiz.enable_autostart(home)
+        print(f"✓ Auto-start at login enabled: {f}" if f else "✗ couldn't enable auto-start here.",
+              file=sys.stderr if not f else sys.stdout)
+        return 0 if f else 1
+    if state == "off":
+        print("✓ Auto-start disabled." if wiz.disable_autostart() else "Auto-start was not set.")
+        return 0
+    print("Auto-start at login: " + ("ON" if wiz.autostart_status() else "off"))
     return 0
 
 
@@ -619,6 +663,9 @@ def _build_parser() -> argparse.ArgumentParser:
     sc = sub.add_parser("shortcut", help="create a desktop launcher (one-click relaunch)")
     common(sc, index=True)
 
+    aus = sub.add_parser("autostart", help="start the server at login (on/off/status)")
+    aus.add_argument("state", nargs="?", choices=["on", "off", "status"], default="status")
+
     sh = sub.add_parser("share", help="Cloudflare quick tunnel to a running server")
     sh.add_argument("--port", default="9119", help="local port to expose (default 9119)")
 
@@ -653,7 +700,7 @@ _DISPATCH = {
     "setup": cmd_setup,
     "parse": cmd_parse, "build": cmd_build, "embed": cmd_embed, "index": cmd_index,
     "serve": cmd_serve, "share": cmd_share, "tunnel": cmd_tunnel, "shortcut": cmd_shortcut,
-    "status": cmd_status, "doctor": cmd_doctor,
+    "autostart": cmd_autostart, "status": cmd_status, "doctor": cmd_doctor,
     "export-static": cmd_export_static, "publish": cmd_publish,
 }
 
