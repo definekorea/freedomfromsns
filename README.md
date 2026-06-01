@@ -83,7 +83,7 @@ curl -fsSL https://raw.githubusercontent.com/definekorea/freedomfromsns/master/i
 2. **설치 명령 실행** — 위 한 줄. 설치 마법사가 **언어를 묻고(한국어/English)**, 다운로드 폴더에서 데이터를 **자동으로 찾아**, 타임라인을 만들고, 브라우저를 엽니다(`http://localhost:8282`). 키 없이 둘러보기·검색이 바로 됩니다.
 3. **(선택) 더 켜기** — 앱 안에서 *똑똑한 검색*(1단계)이나 *AI 대화*(2단계)를 켭니다. AI 대화는 **Gemini · DeepSeek 등 무료 또는 유료 AI API 키**를 설정에서 연결하면 됩니다.
 
-상태 파일(설정·색인·아카이브)은 `~/FreedomFromSNS/`에 저장됩니다. 다음부터는 `ffs serve`로 실행하면 됩니다.
+모든 것은 `~/ffs/` 한 폴더에 정리됩니다 — 페이스북 데이터(`~/ffs/data/`), 색인, 아카이브, 설정. 다음부터는 `ffs serve`로 실행하면 됩니다.
 
 ---
 
@@ -147,7 +147,7 @@ curl -fsSL https://raw.githubusercontent.com/definekorea/freedomfromsns/master/i
 2. **Run the install command** above. The wizard asks your **language (English / 한국어)**, **auto-locates** your export in your Downloads, builds your timeline, and opens the browser at `http://localhost:8282`. Browsing and keyword search work immediately, no key.
 3. **(Optional) Turn on more** — enable *Smart search* (Tier 1) or *Chat* (Tier 2) from inside the app whenever you want. Chat connects a **free or paid AI API key (Gemini, DeepSeek, etc.)** in Settings.
 
-State (config, index, archive) lives in `~/FreedomFromSNS/`. From then on, just run `ffs serve`.
+Everything lives in one folder, `~/ffs/` — your Facebook data (`~/ffs/data/`), index, archive, and config. From then on, just run `ffs serve`.
 
 ### From source (development)
 
@@ -164,7 +164,7 @@ ffs setup            # or run parse → build → serve by hand (see `ffs --help
 Facebook JSON export (read-only)
       │  ffs parse → build  (deterministic; no key)
       ▼
-~/FreedomFromSNS/  (index/posts.jsonl + spaces-data/<year>/*.md)
+~/ffs/  (data/ + index/posts.jsonl + spaces-data/<year>/*.md)
       │  ffs serve
       ▼
 one FastAPI process on :8282  →  the single-page viewer

@@ -146,7 +146,7 @@ The wizard should **not** ask the user to type a path. The export unzips to
 2. In each, look for: a folder matching `facebook-*` **or** any folder containing
    `your_facebook_activity/posts/` (the load-bearing marker), **or** a
    `facebook-*.zip` / `*your*information*.zip`.
-3. If a **.zip** is found, offer to unzip it (to `~/FreedomFromSNS/export/`).
+3. If a **.zip** is found, offer to unzip it (to `~/ffs/data/`).
 4. If several candidates, show the newest with its date and let the user confirm.
 5. Write the chosen path to `config.toml` `[export] root` (replacing the dev
    default `/mnt/d/dev/facebook-data`).
@@ -298,7 +298,7 @@ Reordered around the §0.1 ladder: **ship Tier 0 the fastest, make AI an unlock.
    default install is **pure wheels (Tier 0)**, no `local`/`gpu`/`media` extras. (M) — done.
    The viewer is now bundled **inside** the package (`fbbackup/viewer/`, shipped via
    package-data) so `uv tool install` is fully self-contained; state lives in a
-   stable per-user `~/FreedomFromSNS/` (cwd-independent). Verified end-to-end:
+   stable per-user `~/ffs/` (cwd-independent; FB data in `~/ffs/data/`). Verified end-to-end:
    wheel → isolated venv → serves the viewer + 24k-post index from any cwd.
 3. ✅ **`ffs setup` wizard** (§4): installer **i18n** (§0 step 0, OS-locale default) +
    **auto-locate** the export (§3) + `parse → build` + **open browser at Tier 0**

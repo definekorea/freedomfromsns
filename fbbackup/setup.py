@@ -166,11 +166,11 @@ def locate_export(extra_roots: list[Path] | None = None) -> list[dict]:
 
 
 def unzip_export(zip_path: Path, dest_parent: Path) -> Path:
-    """Extract a Facebook .zip into ``dest_parent/FreedomFromSNS-export/`` and
+    """Extract a Facebook .zip into ``dest_parent/data/`` (i.e. ``~/ffs/data``) and
     return the export root (the dir to set as [export].root — the PARENT of the
     ``facebook-…`` folder, since ``parse`` scans subfolders). Re-extracting
     overwrites in place."""
-    dest = dest_parent / "FreedomFromSNS-export"
+    dest = dest_parent / "data"
     dest.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(zip_path) as zf:
         zf.extractall(dest)

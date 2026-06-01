@@ -37,7 +37,7 @@ def _home() -> Path:
         return Path(env).expanduser()
     if (Path.cwd() / "config.toml").is_file():
         return Path.cwd()
-    return Path.home() / "FreedomFromSNS"
+    return Path.home() / "ffs"   # ~/ffs (= C:\Users\<you>\ffs) — short, findable, no admin
 
 
 def _load_env() -> None:
@@ -89,7 +89,7 @@ def _paths(args) -> dict[str, Path]:
     exp = cfg.get("export", {})
     out = cfg.get("output", {})
     export_root = _abs(_resolve(getattr(args, "export", None), "FBBACKUP_EXPORT_ROOT",
-                                exp.get("root"), "/mnt/d/dev/facebook-data"))
+                                exp.get("root"), "data"))   # default: ~/ffs/data
     index_dir = _abs(_resolve(getattr(args, "index", None), "FBBACKUP_INDEX",
                               out.get("dir"), "index"))
     spaces_root = _abs(_resolve(getattr(args, "spaces", None), "FBBACKUP_SPACES_ROOT",
