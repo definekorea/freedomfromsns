@@ -7,6 +7,7 @@ single-page viewer at `/`. One process, one Gemini key, one port (8282).
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -55,7 +56,24 @@ def create_app(spaces_root: Path, export_root: Path,
     return app
 
 
+def _reload_app() -> FastAPI:
+    """App factory for `--reload` (uvicorn must import the app by string).
+    Reads the paths the parent stashed in the env before handing off."""
+    return create_app(os.environ["FFS_SPACES"], os.environ["FFS_EXPORT"],
+                      os.environ.get("FFS_CHAT_MODEL", "gemini-2.5-flash"))
+
+
 def serve(spaces_root: Path, export_root: Path, host: str = "127.0.0.1",
-          port: int = 8282, chat_model: str = "gemini-2.5-flash") -> None:
+          port: int = 8282, chat_model: str = "gemini-2.5-flash",
+          reload: bool = False) -> None:
     import uvicorn
-    uvicorn.run(create_app(spaces_root, export_root, chat_model), host=host, port=port)
+    if reload:
+        # auto-reload on Python edits only (watch the package, not viewer/ — the
+        # frontend is static + cache-busted, so it never needs a server restart).
+        os.environ["FFS_SPACES"] = str(spaces_root)
+        os.environ["FFS_EXPORT"] = str(export_root)
+        os.environ["FFS_CHAT_MODEL"] = chat_model
+        uvicorn.run("fbbackup.ffs_server:_reload_app", factory=True, host=host,
+                    port=port, reload=True, reload_dirs=[str(_PKG)])
+    else:
+        uvicorn.run(create_app(spaces_root, export_root, chat_model), host=host, port=port)

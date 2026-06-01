@@ -138,7 +138,8 @@ def cmd_serve(args) -> int:
     host = args.host or os.environ.get("FBBACKUP_HOST") or cfg_serve.get("host", "127.0.0.1")
     port = int(args.port or os.environ.get("FBBACKUP_PORT") or cfg_serve.get("port", 8282))
     print(f"FreedomFromSNS → http://{host}:{port}  (chat: {chat_model}; Ctrl-C to stop)", flush=True)
-    serve(p["spaces"], p["export"], host=host, port=port, chat_model=chat_model)
+    serve(p["spaces"], p["export"], host=host, port=port, chat_model=chat_model,
+          reload=bool(getattr(args, "reload", False)))
     return 0
 
 
@@ -306,6 +307,8 @@ def _build_parser() -> argparse.ArgumentParser:
     sv = sub.add_parser("serve", help="run the standalone timeline viewer")
     common(sv, index=True)
     sv.add_argument("--host"); sv.add_argument("--port")
+    sv.add_argument("--reload", action="store_true",
+                    help="auto-reload the server on Python edits (dev)")
 
     sh = sub.add_parser("share", help="Cloudflare quick tunnel to a running server")
     sh.add_argument("--port", default="9119", help="local port to expose (default 9119)")
