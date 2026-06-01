@@ -152,6 +152,10 @@ def cmd_serve(args) -> int:
     host = args.host or os.environ.get("FBBACKUP_HOST") or cfg_serve.get("host", "127.0.0.1")
     port = int(args.port or os.environ.get("FBBACKUP_PORT") or cfg_serve.get("port", 8282))
     print(f"FreedomFromSNS → http://{host}:{port}  (chat: {chat_model}; Ctrl-C to stop)", flush=True)
+    if getattr(args, "open", False):
+        import threading
+        import webbrowser
+        threading.Timer(1.5, lambda: webbrowser.open(f"http://{host}:{port}")).start()
     serve(p["spaces"], p["export"], host=host, port=port, chat_model=chat_model,
           reload=bool(getattr(args, "reload", False)))
     return 0
@@ -190,7 +194,7 @@ def cmd_setup(args) -> int:
         src = _abs(args.export)
     else:
         say("searching")
-        cands = wiz.locate_export()
+        cands = wiz.locate_export(extra_roots=[home, home / "data"])   # always check the FFS home + its data/
         chosen = None
         if len(cands) == 1 or (cands and args.yes):
             chosen = cands[0]
@@ -313,7 +317,13 @@ def cmd_setup(args) -> int:
     else:
         say("embed_skip")
 
-    # 4. Open the browser and serve (the wow moment).
+    # 4. One-click relaunch: a desktop launcher (unless told otherwise).
+    if not getattr(args, "no_shortcut", False):
+        sc = wiz.create_launcher(home)
+        if sc:
+            say("shortcut_made", path=sc)
+
+    # 5. Open the browser and serve (the wow moment).
     if args.no_serve:
         return 0
     from fbbackup.ffs_server import serve
@@ -329,6 +339,19 @@ def cmd_setup(args) -> int:
         threading.Timer(1.5, lambda: webbrowser.open(url)).start()  # after the server is up
     serve(p["spaces"], p["export"], host=host, port=port, chat_model=chat_model)
     return 0
+
+
+def cmd_shortcut(args) -> int:
+    """Create (or refresh) a desktop launcher that reopens the archive in one click."""
+    from fbbackup import setup as wiz
+    home = _home()
+    os.environ["FBBACKUP_HOME"] = str(home)
+    f = wiz.create_launcher(home)
+    if f:
+        print(f"✓ launcher created: {f}\n  Double-click it to reopen FreedomFromSNS.", flush=True)
+        return 0
+    print("✗ couldn't create a launcher.", file=sys.stderr)
+    return 1
 
 
 def cmd_tunnel(args) -> int:
@@ -570,6 +593,7 @@ def _build_parser() -> argparse.ArgumentParser:
     st.add_argument("--host"); st.add_argument("--port")
     st.add_argument("--no-serve", action="store_true", help="stop after build; don't start the server")
     st.add_argument("--no-open", action="store_true", help="serve but don't auto-open a browser")
+    st.add_argument("--no-shortcut", action="store_true", help="don't create a desktop launcher")
 
     common(sub.add_parser("parse", help="export → index/posts.jsonl"), export=True, index=True)
     common(sub.add_parser("build", help="index → spaces-data markdown rows"), index=True, spaces=True)
@@ -579,8 +603,12 @@ def _build_parser() -> argparse.ArgumentParser:
     sv = sub.add_parser("serve", help="run the standalone timeline viewer")
     common(sv, index=True)
     sv.add_argument("--host"); sv.add_argument("--port")
+    sv.add_argument("--open", action="store_true", help="open the browser when the server starts")
     sv.add_argument("--reload", action="store_true",
                     help="auto-reload the server on Python edits (dev)")
+
+    sc = sub.add_parser("shortcut", help="create a desktop launcher (one-click relaunch)")
+    common(sc, index=True)
 
     sh = sub.add_parser("share", help="Cloudflare quick tunnel to a running server")
     sh.add_argument("--port", default="9119", help="local port to expose (default 9119)")
@@ -615,7 +643,8 @@ def _build_parser() -> argparse.ArgumentParser:
 _DISPATCH = {
     "setup": cmd_setup,
     "parse": cmd_parse, "build": cmd_build, "embed": cmd_embed, "index": cmd_index,
-    "serve": cmd_serve, "share": cmd_share, "tunnel": cmd_tunnel, "status": cmd_status, "doctor": cmd_doctor,
+    "serve": cmd_serve, "share": cmd_share, "tunnel": cmd_tunnel, "shortcut": cmd_shortcut,
+    "status": cmd_status, "doctor": cmd_doctor,
     "export-static": cmd_export_static, "publish": cmd_publish,
 }
 

@@ -89,7 +89,7 @@ curl -fsSL https://raw.githubusercontent.com/definekorea/freedomfromsns/master/i
 2. **설치 명령 실행** — 위 한 줄. 마법사가 **언어를 묻고(한국어/English)**, 다운로드 폴더에서 **.zip이든 풀어 둔 폴더든 자동으로 찾습니다**. zip은 `~/ffs/data`에 풀고, 이미 풀어 둔 폴더는 **그 자리에서 쓰거나 `~/ffs/data`로 옮길지** 물어봅니다(직접 경로를 입력해도 됨). 그런 다음 타임라인을 만들고, **하드웨어를 확인해 스마트 검색**(GPU가 있으면 로컬 모델, 없으면 무료 AI 키)을 켤지 물어본 뒤(건너뛰어도 됨 — 색인은 백그라운드에서 만들어집니다), 브라우저를 엽니다(`http://localhost:8282`) — 키 없이 둘러보기·검색이 바로 됩니다.
 3. **(선택) 더 켜기** — 앱 안에서 *똑똑한 검색*(1단계)이나 *AI 대화*(2단계)를 켭니다. AI 대화는 **Gemini · DeepSeek 등 무료 또는 유료 AI API 키**를 설정에서 연결하면 됩니다.
 
-모든 것은 `~/ffs/` 한 폴더에 정리됩니다 — 페이스북 데이터(`~/ffs/data/`), 색인, 아카이브, 설정. 다음부터는 `ffs serve`로 실행하면 됩니다.
+모든 것은 `~/ffs/` 한 폴더에 정리됩니다 — 페이스북 데이터(`~/ffs/data/`), 색인, 아카이브, 설정. **다시 열 때**는 설치 시 바탕화면에 생긴 **FreedomFromSNS 바로가기**를 더블클릭하세요(또는 `ffs serve`). 팁: 페이스북 데이터를 `~/ffs/data`에 넣어두면 마법사가 경로 입력 없이 자동으로 찾습니다.
 
 친구에게 보여주고 싶다면 앱 상단의 **🌐 (웹에 공개)** 버튼으로 임시 공개 링크(Cloudflare)를 만들 수 있습니다 — 공개 전에 비공개로 둘 글은 비공개로 돌리라고 안내해 줍니다. 내 도메인의 **고정 주소**를 원하면 `ffs tunnel`을 실행하세요(무료 Cloudflare 계정 + 도메인 필요).
 
@@ -161,7 +161,7 @@ curl -fsSL https://raw.githubusercontent.com/definekorea/freedomfromsns/master/i
 2. **Run the install command** above. The wizard asks your **language (English / 한국어)** and **auto-locates** your export in your Downloads — a `.zip` or an already-extracted folder. A zip is extracted into `~/ffs/data`; an extracted folder is **used in place or moved into `~/ffs/data`** (your choice), or you can type a path yourself. Then it builds your timeline, **checks your hardware and offers smart search** (a local model if you have a GPU, otherwise a free AI key — skippable; the index builds in the background), and opens the browser at `http://localhost:8282` — browsing and keyword search work immediately, no key.
 3. **(Optional) Turn on more** — enable *Smart search* (Tier 1) or *Chat* (Tier 2) from inside the app whenever you want. Chat connects a **free or paid AI API key (Gemini, DeepSeek, etc.)** in Settings.
 
-Everything lives in one folder, `~/ffs/` — your Facebook data (`~/ffs/data/`), index, archive, and config. From then on, just run `ffs serve`.
+Everything lives in one folder, `~/ffs/` — your Facebook data (`~/ffs/data/`), index, archive, and config. **To reopen it later**, double-click the **FreedomFromSNS** shortcut that install put on your Desktop (or run `ffs serve`). Tip: drop your export in `~/ffs/data` and the wizard finds it with no path typing.
 
 To show a friend, the **🌐 Publish** button in the app creates a temporary public link (Cloudflare) — it reminds you to set sensitive posts to private first. For a permanent address on your own domain, run `ffs tunnel` (needs a free Cloudflare account + a domain).
 

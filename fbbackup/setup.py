@@ -83,6 +83,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "tn_service": "For an always-on address (survives reboots), install it as a service: "
                       "`cloudflared --config {cfg} service install`.",
         "opening":   "Opening your archive at {url} …",
+        "shortcut_made": "Created a launcher: {path}\n  Double-click it any time to reopen your archive.",
         "lang_prompt": "Language / 언어 — [1] English  [2] 한국어 (default {d}): ",
         "no_posts":  "No posts found in that export. Make sure you downloaded "
                      "*Posts* in *JSON* format from Facebook, then unzipped it.",
@@ -149,6 +150,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "tn_service": "재부팅에도 항상 켜두려면 서비스로 설치하세요: "
                       "`cloudflared --config {cfg} service install`.",
         "opening":   "{url} 에서 기록을 엽니다…",
+        "shortcut_made": "바로가기를 만들었습니다: {path}\n  더블클릭하면 언제든 기록을 다시 열 수 있어요.",
         "lang_prompt": "Language / 언어 — [1] English  [2] 한국어 (기본 {d}): ",
         "no_posts":  "그 내보내기에서 게시물을 찾지 못했습니다. 페이스북에서 "
                      "*게시물*을 *JSON* 형식으로 받아 압축을 풀었는지 확인하세요.",
@@ -528,6 +530,38 @@ def spawn_background_embed(home: Path, provider: str, device: str = "", model: s
         kw["start_new_session"] = True
     subprocess.Popen([sys.executable, "-m", "fbbackup.cli", "embed"],
                      stdout=log, stderr=log, stdin=subprocess.DEVNULL, env=env, **kw)
+
+
+def _desktop_dir() -> Path | None:
+    """The real Desktop (handles OneDrive-redirected Desktop on Windows)."""
+    h = Path.home()
+    for c in (h / "Desktop", h / "OneDrive" / "Desktop"):
+        if c.is_dir():
+            return c
+    return None
+
+
+def create_launcher(home: Path) -> Path | None:
+    """Write a double-clickable launcher (Desktop if available, else the home dir)
+    that starts the local server and opens the browser — one-click relaunch. Returns
+    the path written. Bakes FBBACKUP_HOME so it always finds this archive."""
+    py = sys.executable
+    where = _desktop_dir() or home
+    try:
+        if os.name == "nt":
+            f = where / "FreedomFromSNS.cmd"
+            f.write_text("@echo off\r\n"
+                         f'set "FBBACKUP_HOME={home}"\r\n'
+                         f'"{py}" -m fbbackup.cli serve --open\r\n', encoding="utf-8")
+        else:
+            ext = "command" if sys.platform == "darwin" else "sh"
+            f = where / f"FreedomFromSNS.{ext}"
+            f.write_text(f'#!/bin/sh\nexport FBBACKUP_HOME="{home}"\n'
+                         f'exec "{py}" -m fbbackup.cli serve --open\n', encoding="utf-8")
+            f.chmod(0o755)
+        return f
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def set_export_root(home: Path, root: Path) -> Path:
