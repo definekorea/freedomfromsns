@@ -55,6 +55,13 @@
 | **1 — 똑똑한 검색** | 의미 기반(시맨틱) 검색 | 앱에서 선택: 로컬 모델 1회 다운로드(키 불필요) **또는** 무료 AI API 키(예: Gemini) |
 | **2 — AI 대화** | 내 기록과 대화 | AI API 키 — Gemini · DeepSeek 등 **무료 또는 유료** |
 
+## 한계 및 알아둘 점
+
+이 한계들은 버그가 아니라 페이스북이 내보내기에 **무엇을 넣고 빼는지**에서 비롯됩니다.
+
+- **공유(리셰어)한 게시물은 대부분 보이지 않습니다.** 페이스북 내보내기 데이터에는 남의 글을 공유할 때의 원본 링크·내용이 거의 들어 있지 않습니다. 데이터만으로는 복원할 수 없고, 실제 페이스북 페이지를 직접 스캔해야 하는데 페이스북이 이를 최대한 어렵게 막아 두었습니다. (그래서 공유는 메인 타임라인 대신 별도 **공유** 칸에 모아 둡니다.)
+- **공개 범위·"나만 보기" 설정은 내보내기에 포함되지 않습니다.** 그래서 모든 글이 일단 표시되며, 숨기고 싶은 글은 앱에서 직접 **숨김/비공개**로 표시해야 합니다. 페이스북이 의도적으로 가리는 정보가 많아 자동 분류·연동에는 한계가 있습니다 — 계속 연구 중입니다.
+
 ## 설치
 
 한 줄이면 끝입니다. `uv`가 파이썬까지 알아서 관리하므로 파이썬·가상환경·ffmpeg를 따로 설치할 필요가 없습니다. **설치 명령 + 페이스북 데이터**만 있으면 되고, API 키는 선택입니다.
@@ -111,6 +118,13 @@ Each tier is optional and never blocks the one below it.
 | **0 — Your archive** | browse · filter · timeline · **keyword search** | nothing (no key, no download) |
 | **1 — Smart search** | meaning-based / semantic search | in-app opt-in: a one-time local model (no key) **or** a free AI API key (e.g. Gemini) |
 | **2 — Chat with your archive** | talk to your own posts | an AI API key — free or paid (Gemini, DeepSeek, etc.) |
+
+## Limitations & good to know
+
+These come from what Facebook **does and doesn't put in the export** — they aren't bugs.
+
+- **Reshared posts mostly don't appear.** Facebook's export rarely includes the original link or content of a post you shared from someone else, so it can't be reconstructed from the data alone — you'd have to scan the live Facebook page, which Facebook makes as hard as possible. (That's why reshares are collected in a separate **Reshares (공유)** bucket rather than the main timeline.)
+- **Audience / "Only me" privacy settings aren't in the export.** So everything is shown by default; hide what you don't want to see with the app's **hide / private** tags. Facebook deliberately withholds a lot, so automatic classification and integrations have limits — an area of ongoing research.
 
 ## Install
 
