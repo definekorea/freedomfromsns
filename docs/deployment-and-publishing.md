@@ -309,8 +309,12 @@ Reordered around the §0.1 ladder: **ship Tier 0 the fastest, make AI an unlock.
    end-user one-liner is `curl …/install-ffs.sh | sh` (or the `.ps1` via `irm | iex`).
    Remaining for "any newcomer": the repo must be **public**, and each version cut
    as a release: `uv build --wheel && gh release create vX.Y.Z dist/*.whl`.*
-4. **Hardware probe** in `ffs doctor` (GPU/VRAM/CPU) → drives the in-app
-   **"Smarter search?" (Tier 1)** card: local model vs. free cloud key (§4 step 3). (M)
+4. ✅ **Hardware probe + Tier-1 setup** — `ffs setup` probes the GPU (nvidia-smi) /
+   Apple-Silicon / CPU after build and offers **smart search**: `[1]` local model
+   (auto-installs `fastembed`/`onnxruntime-gpu` via uv on demand), `[2]` a Gemini
+   API key, `[3]` skip. The chosen provider embeds in a **detached background
+   process** (logs to `embed.log`) while the archive opens — Tier 0 never waits.
+   `--embed local|gemini|skip` for non-interactive runs. (M) — done.
 5. **Mistral embedding provider** in `embed.py` (alongside gemini/weft/local) so the
    weak-hardware route offers Gemini **or** Mistral. (S)
 6. **Background, resumable embedding** surfaced as an in-app progress pill, so Tier 1

@@ -14,6 +14,7 @@ from __future__ import annotations
 import os
 import re
 import shutil
+import sys
 import zipfile
 from pathlib import Path
 
@@ -42,10 +43,21 @@ STRINGS: dict[str, dict[str, str]] = {
         "built":     "Timeline ready ({n} entries).",
         "tier0":     "✓ Your archive is ready — browse, filter, and keyword search "
                      "work now, with no AI key needed.",
-        "tier1_hint": "  Optional: turn on smarter (meaning-based) search in the app "
-                      "— a one-time local download, or a free key. Keyword search "
-                      "already works without it.",
-        "tier2_hint": "  Optional: connect an AI in the app to chat with your archive.",
+        "smart_offer": "Smarter (meaning-based) search & AI chat are optional — "
+                       "browsing and keyword search already work without any key.",
+        "hw_gpu":   "  GPU detected: {name}. It can run a local model fast — no key needed.",
+        "hw_cpu":   "  No GPU detected. A local model still runs on the CPU (slower); "
+                    "for speed a free AI API key is recommended.",
+        "choose_embed": "Enable smart search? [1] local model (no key)  "
+                        "[2] AI API key (Gemini)  [3] skip for now (default {d}): ",
+        "installing_local": "Installing the local model components (one time, a few minutes)…",
+        "install_fail": "Couldn't install the local model automatically — skipping. "
+                        "Browsing still works; enable smart search later in the app.",
+        "ask_gemini_key": "Paste a Gemini API key (free: https://aistudio.google.com/apikey), "
+                          "or leave blank to skip: ",
+        "embed_started": "Building the smart-search index in the background (see embed.log) "
+                         "— browse while it runs.",
+        "embed_skip": "Skipped. You can enable smart search & chat anytime in the app.",
         "opening":   "Opening your archive at {url} …",
         "lang_prompt": "Language / 언어 — [1] English  [2] 한국어 (default {d}): ",
         "no_posts":  "No posts found in that export. Make sure you downloaded "
@@ -73,9 +85,21 @@ STRINGS: dict[str, dict[str, str]] = {
         "built":     "타임라인 준비 완료 (항목 {n}개).",
         "tier0":     "✓ 기록 준비 완료 — 둘러보기, 필터, 키워드 검색이 AI 키 없이 "
                      "바로 됩니다.",
-        "tier1_hint": "  선택: 앱에서 더 똑똑한(의미 기반) 검색을 켤 수 있습니다 — "
-                      "1회 로컬 다운로드 또는 무료 키. 키워드 검색은 없이도 됩니다.",
-        "tier2_hint": "  선택: 앱에서 AI를 연결하면 기록과 대화할 수 있습니다.",
+        "smart_offer": "더 똑똑한(의미 기반) 검색과 AI 대화는 선택입니다 — "
+                       "둘러보기·키워드 검색은 키 없이도 이미 됩니다.",
+        "hw_gpu":   "  GPU 감지됨: {name}. 로컬 모델을 빠르게 돌릴 수 있어요 — 키 불필요.",
+        "hw_cpu":   "  GPU가 없습니다. 로컬 모델은 CPU로도 되지만(느림), 빠르게 하려면 "
+                    "무료 AI API 키를 권장합니다.",
+        "choose_embed": "스마트 검색을 켤까요? [1] 로컬 모델(키 불필요)  "
+                        "[2] AI API 키(Gemini)  [3] 지금은 건너뛰기 (기본 {d}): ",
+        "installing_local": "로컬 모델 구성요소를 설치하는 중… (최초 1회, 몇 분 걸릴 수 있어요)",
+        "install_fail": "로컬 모델 자동 설치에 실패해 건너뜁니다. 둘러보기는 그대로 되고, "
+                        "나중에 앱에서 스마트 검색을 켤 수 있어요.",
+        "ask_gemini_key": "Gemini API 키를 붙여넣으세요(무료 발급: https://aistudio.google.com/apikey). "
+                          "건너뛰려면 비워 두세요: ",
+        "embed_started": "백그라운드에서 스마트 검색 색인을 만드는 중입니다(embed.log) "
+                         "— 그 사이 자유롭게 둘러보세요.",
+        "embed_skip": "건너뛰었습니다. 스마트 검색·AI 대화는 언제든 앱에서 켤 수 있어요.",
         "opening":   "{url} 에서 기록을 엽니다…",
         "lang_prompt": "Language / 언어 — [1] English  [2] 한국어 (기본 {d}): ",
         "no_posts":  "그 내보내기에서 게시물을 찾지 못했습니다. 페이스북에서 "
@@ -248,6 +272,82 @@ _TEMPLATE = (
     'host = "127.0.0.1"\n'
     'port = 8282\n'
 )
+
+
+# ── hardware probe + optional semantic-search setup (Tier 1) ───────────────────
+def detect_gpu() -> dict:
+    """Best-effort NVIDIA GPU probe via nvidia-smi → {gpu, name, vram_mb}."""
+    import subprocess
+    exe = shutil.which("nvidia-smi")
+    if not exe:
+        return {"gpu": False, "name": "", "vram_mb": 0}
+    try:
+        out = subprocess.run([exe, "--query-gpu=name,memory.total", "--format=csv,noheader,nounits"],
+                             capture_output=True, text=True, timeout=8)
+        name, mem = (s.strip() for s in (out.stdout or "").strip().splitlines()[0].split(","))
+        return {"gpu": True, "name": name, "vram_mb": int(float(mem))}
+    except Exception:  # noqa: BLE001
+        return {"gpu": False, "name": "", "vram_mb": 0}
+
+
+def detect_hardware() -> dict:
+    """GPU/CPU summary + a recommendation: 'local' when a CUDA GPU or Apple Silicon
+    is present (fast embeddings), else 'key' (local CPU embedding of a big archive
+    is slow, so a free/paid API key is the smoother path)."""
+    import platform
+    g = detect_gpu()
+    apple = platform.system() == "Darwin" and platform.machine() in ("arm64", "aarch64")
+    return {**g, "cpu": os.cpu_count() or 1, "apple_silicon": apple,
+            "recommend": "local" if (g["gpu"] or apple) else "key"}
+
+
+def ensure_local_deps(gpu: bool) -> bool:
+    """Make fastembed (+ onnxruntime-gpu for a GPU) importable in THIS interpreter,
+    installing via uv (preferred) or pip. Returns True if available afterwards.
+    The base install is pure wheels, so the local model is fetched only on demand."""
+    import subprocess
+    need: list[str] = []
+    try:
+        import fastembed  # noqa: F401
+    except ImportError:
+        need.append("fastembed")
+    if gpu:
+        try:
+            import onnxruntime  # noqa: F401
+        except ImportError:
+            need.append("onnxruntime-gpu")
+    if not need:
+        return True
+    attempts = []
+    if shutil.which("uv"):
+        attempts.append(["uv", "pip", "install", "--python", sys.executable, *need])
+    attempts.append([sys.executable, "-m", "pip", "install", *need])
+    for cmd in attempts:
+        try:
+            if subprocess.run(cmd, timeout=900).returncode == 0:
+                return True
+        except Exception:  # noqa: BLE001
+            continue
+    return False
+
+
+def spawn_background_embed(home: Path, provider: str, device: str = "") -> None:
+    """Kick off `ffs embed` as a detached background process (logs to embed.log) so
+    the semantic index builds while the user browses. Resumable + safe to re-run."""
+    import subprocess
+    env = dict(os.environ)
+    env["FBBACKUP_HOME"] = str(home)
+    env["FBBACKUP_EMBED_PROVIDER"] = provider     # force this provider for the corpus
+    if device:
+        env["FBBACKUP_EMBED_DEVICE"] = device
+    log = open(home / "embed.log", "ab")
+    kw: dict = {}
+    if os.name == "nt":
+        kw["creationflags"] = 0x00000008 | 0x00000200   # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+    else:
+        kw["start_new_session"] = True
+    subprocess.Popen([sys.executable, "-m", "fbbackup.cli", "embed"],
+                     stdout=log, stderr=log, stdin=subprocess.DEVNULL, env=env, **kw)
 
 
 def set_export_root(home: Path, root: Path) -> Path:

@@ -168,6 +168,7 @@ def cmd_setup(args) -> int:
 
     home = _home()
     home.mkdir(parents=True, exist_ok=True)   # first run: create the per-user state dir
+    os.environ["FBBACKUP_HOME"] = str(home)   # pin it so providers/embed/background all agree
     lang = args.lang or wiz.detect_lang()
     if not args.lang and not args.yes:  # offer a language choice unless told
         try:
@@ -262,10 +263,47 @@ def cmd_setup(args) -> int:
         bres = materialize(p["index"], p["spaces"])
     say("built", n=bres.get("written", "?"))
 
-    # 3. Tier 0 is ready; AI tiers are optional unlocks (surfaced in-app).
+    # 3. Tier 0 is ready. Offer smart search / chat (Tier 1) — GPU-aware.
     say("tier0")
-    say("tier1_hint")
-    say("tier2_hint")
+    choice = args.embed or ("skip" if args.yes else "")
+    if not choice:
+        hw = wiz.detect_hardware()
+        say("smart_offer")
+        say("hw_gpu", name=hw["name"]) if hw["gpu"] else say("hw_cpu")
+        default = "1" if hw["recommend"] == "local" else "2"
+        try:
+            pick = input(wiz.t(lang, "choose_embed", d=default)).strip() or default
+        except EOFError:
+            pick = "3"
+        choice = {"1": "local", "2": "gemini", "3": "skip"}.get(pick, "skip")
+        gpu = hw["gpu"]
+    else:
+        gpu = wiz.detect_gpu()["gpu"]
+
+    if choice == "local":
+        say("installing_local")
+        if wiz.ensure_local_deps(gpu):
+            wiz.spawn_background_embed(home, "local", device="gpu" if gpu else "")
+            say("embed_started")
+        else:
+            say("install_fail")
+    elif choice == "gemini":
+        from .embed import gemini_key
+        from . import providers
+        key = gemini_key()
+        if not key:
+            try:
+                key = input(wiz.t(lang, "ask_gemini_key")).strip()
+            except EOFError:
+                key = ""
+        if key:
+            providers.set_key("GEMINI_API_KEY", key)   # → ~/ffs/.env + process env
+            wiz.spawn_background_embed(home, "gemini")
+            say("embed_started")
+        else:
+            say("embed_skip")
+    else:
+        say("embed_skip")
 
     # 4. Open the browser and serve (the wow moment).
     if args.no_serve:
@@ -445,6 +483,8 @@ def _build_parser() -> argparse.ArgumentParser:
     common(st, export=True, index=True, spaces=True)
     st.add_argument("--lang", choices=["en", "ko"], help="UI language (default: OS locale)")
     st.add_argument("--yes", action="store_true", help="non-interactive: accept the newest export found")
+    st.add_argument("--embed", choices=["local", "gemini", "skip"],
+                    help="semantic search: local model, a Gemini key, or skip (default: ask, or skip with --yes)")
     st.add_argument("--host"); st.add_argument("--port")
     st.add_argument("--no-serve", action="store_true", help="stop after build; don't start the server")
     st.add_argument("--no-open", action="store_true", help="serve but don't auto-open a browser")

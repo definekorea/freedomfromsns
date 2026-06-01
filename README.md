@@ -86,7 +86,7 @@ curl -fsSL https://raw.githubusercontent.com/definekorea/freedomfromsns/master/i
    - **정보 종류:** 기본값 그대로 두면 됩니다(활동 로그류만 빠져 있고 나머지는 선택돼 있음). 이 앱엔 최소한 **게시물(Posts)** 만 있으면 됩니다.
    - 미디어 화질은 **높음(High)** 권장 — 사진·영상이 선명합니다.
    - **내보내기 시작** → 준비되면 이메일이 옵니다(몇 시간~며칠). 받은 **`.zip`** 은 풀어도 되고 그대로 둬도 됩니다 — 마법사가 알아서 처리합니다.
-2. **설치 명령 실행** — 위 한 줄. 마법사가 **언어를 묻고(한국어/English)**, 다운로드 폴더에서 **.zip이든 풀어 둔 폴더든 자동으로 찾습니다**. zip은 `~/ffs/data`에 풀고, 이미 풀어 둔 폴더는 **그 자리에서 쓰거나 `~/ffs/data`로 옮길지** 물어봅니다(직접 경로를 입력해도 됨). 그런 다음 타임라인을 만들고 브라우저를 엽니다(`http://localhost:8282`) — 키 없이 둘러보기·검색이 바로 됩니다.
+2. **설치 명령 실행** — 위 한 줄. 마법사가 **언어를 묻고(한국어/English)**, 다운로드 폴더에서 **.zip이든 풀어 둔 폴더든 자동으로 찾습니다**. zip은 `~/ffs/data`에 풀고, 이미 풀어 둔 폴더는 **그 자리에서 쓰거나 `~/ffs/data`로 옮길지** 물어봅니다(직접 경로를 입력해도 됨). 그런 다음 타임라인을 만들고, **하드웨어를 확인해 스마트 검색**(GPU가 있으면 로컬 모델, 없으면 무료 AI 키)을 켤지 물어본 뒤(건너뛰어도 됨 — 색인은 백그라운드에서 만들어집니다), 브라우저를 엽니다(`http://localhost:8282`) — 키 없이 둘러보기·검색이 바로 됩니다.
 3. **(선택) 더 켜기** — 앱 안에서 *똑똑한 검색*(1단계)이나 *AI 대화*(2단계)를 켭니다. AI 대화는 **Gemini · DeepSeek 등 무료 또는 유료 AI API 키**를 설정에서 연결하면 됩니다.
 
 모든 것은 `~/ffs/` 한 폴더에 정리됩니다 — 페이스북 데이터(`~/ffs/data/`), 색인, 아카이브, 설정. 다음부터는 `ffs serve`로 실행하면 됩니다.
@@ -156,7 +156,7 @@ curl -fsSL https://raw.githubusercontent.com/definekorea/freedomfromsns/master/i
    - **Information types:** the defaults are fine (everything except activity logs is pre-selected); at a minimum keep **Posts** — that's what this app reads.
    - Media quality **High** is recommended (sharper photos/videos).
    - **Start export** → Meta emails you when it's ready (hours to a few days). Leave the **`.zip`** zipped or unzip it — the wizard handles either.
-2. **Run the install command** above. The wizard asks your **language (English / 한국어)** and **auto-locates** your export in your Downloads — a `.zip` or an already-extracted folder. A zip is extracted into `~/ffs/data`; an extracted folder is **used in place or moved into `~/ffs/data`** (your choice), or you can type a path yourself. Then it builds your timeline and opens the browser at `http://localhost:8282` — browsing and keyword search work immediately, no key.
+2. **Run the install command** above. The wizard asks your **language (English / 한국어)** and **auto-locates** your export in your Downloads — a `.zip` or an already-extracted folder. A zip is extracted into `~/ffs/data`; an extracted folder is **used in place or moved into `~/ffs/data`** (your choice), or you can type a path yourself. Then it builds your timeline, **checks your hardware and offers smart search** (a local model if you have a GPU, otherwise a free AI key — skippable; the index builds in the background), and opens the browser at `http://localhost:8282` — browsing and keyword search work immediately, no key.
 3. **(Optional) Turn on more** — enable *Smart search* (Tier 1) or *Chat* (Tier 2) from inside the app whenever you want. Chat connects a **free or paid AI API key (Gemini, DeepSeek, etc.)** in Settings.
 
 Everything lives in one folder, `~/ffs/` — your Facebook data (`~/ffs/data/`), index, archive, and config. From then on, just run `ffs serve`.
