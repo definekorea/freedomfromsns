@@ -34,9 +34,9 @@ STRINGS: dict[str, dict[str, str]] = {
                       "(no */your_facebook_activity/posts inside).",
         "unzipping": "Unzipping {path} …",
         "using":     "Using export: {path}",
-        "data_place": "Use it where it is, or move it into ~/ffs/data? "
-                      "[1] keep it here (default)  [2] move it in: ",
-        "moving":    "Moving your export into ~/ffs/data …",
+        "data_place": "Move your Facebook data into your archive folder so it's all "
+                      "in one place?\n  → {dest}\n  [Y/n] (press Enter for yes): ",
+        "moving":    "Moving your data into {dest} …",
         "parsing":   "Reading your posts…",
         "building":  "Building your timeline…",
         "parsed":    "Read {n} posts.",
@@ -112,9 +112,9 @@ STRINGS: dict[str, dict[str, str]] = {
                       "(*/your_facebook_activity/posts 없음).",
         "unzipping": "{path} 압축을 푸는 중…",
         "using":     "사용할 내보내기: {path}",
-        "data_place": "현재 위치에서 그대로 쓸까요, ~/ffs/data로 옮길까요? "
-                      "[1] 그대로 두기(기본)  [2] 옮기기: ",
-        "moving":    "내보내기를 ~/ffs/data로 옮기는 중…",
+        "data_place": "페이스북 데이터를 기록 폴더로 옮겨 한곳에 모을까요?\n"
+                      "  → {dest}\n  [Y/n] (Enter = 예): ",
+        "moving":    "데이터를 {dest}(으)로 옮기는 중…",
         "parsing":   "게시물을 읽는 중…",
         "building":  "타임라인을 만드는 중…",
         "parsed":    "게시물 {n}개를 읽었습니다.",
@@ -504,6 +504,25 @@ def embed_viable(mb: dict, post_count: int, available_mb: int) -> tuple[bool, in
     peak = int(mb.get("peak_mb") or 0)
     ram_ok = (available_mb <= 0) or (peak <= 0) or (peak < 0.6 * available_mb)
     return (tps > 0 and est_min <= _MAX_LOCAL_MIN and ram_ok, est_min)
+
+
+def test_local(spaces_root: Path, post_count: int, hw: dict) -> dict:
+    """Empirically test whether local (no-key) smart search is worth it on THIS
+    machine, and return the basis for defaulting the wizard's question:
+    ``{viable, est_min, model, deps}``.
+
+    Installs the local-embedding deps, then micro-benchmarks the hardware-matched
+    model on a sample of the user's own archive and projects the full-archive time
+    (``embed_viable`` backs off if it's too slow or RAM-risky). Best-effort: if the
+    deps won't install, ``deps=False`` and ``viable=False`` (→ the wizard defaults
+    to skip). Safe to call twice — dep install is idempotent/cached."""
+    rec = recommend_embed(hw)
+    if not ensure_local_deps(bool(hw.get("gpu"))):
+        return {"viable": False, "est_min": 0, "model": rec["model"], "deps": False}
+    sample = sample_corpus(spaces_root, n=16)
+    mb = micro_benchmark(rec["model"], sample) if sample else {"ok": True, "tps": 50, "peak_mb": 0}
+    viable, est_min = embed_viable(mb, post_count, hw.get("available_mb", 0))
+    return {"viable": viable, "est_min": est_min, "model": rec["model"], "deps": True}
 
 
 def ensure_local_deps(gpu: bool) -> bool:

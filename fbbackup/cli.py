@@ -261,14 +261,16 @@ def cmd_setup(args) -> int:
             say("not_export")
             return 2
         chosen_root = root
-        # already-extracted folder elsewhere → keep in place (default), or move into ~/ffs/data
+        # already-extracted folder elsewhere → offer to consolidate it into the
+        # archive home (default = yes). The user can decline to keep it in place.
         if not args.yes and not wiz.is_within(root, home):
+            dest = home / "data"
             try:
-                ans = input(wiz.t(lang, "data_place")).strip().lower()
+                ans = input(wiz.t(lang, "data_place", dest=dest)).strip().lower()
             except EOFError:
                 ans = ""
-            if ans in ("2", "m", "move", "옮기기", "이동"):
-                say("moving")
+            if ans not in ("n", "no", "ㄴ", "아니", "아니오", "2", "keep"):  # Enter/anything else = move it in
+                say("moving", dest=dest)
                 chosen_root = wiz.relocate_export(root, home)
 
     wiz.set_export_root(home, chosen_root)
@@ -297,37 +299,50 @@ def cmd_setup(args) -> int:
         bres = materialize(p["index"], p["spaces"])
     say("built", n=bres.get("written", "?"))
 
-    # 3. Tier 0 is ready. Offer smart search / chat (Tier 1) — hardware-aware.
+    # 3. Tier 0 is ready. Decide smart search by TESTING the hardware first, then
+    #    default the question to whatever the test concludes (Enter accepts it).
     say("tier0")
     hw = wiz.detect_hardware()
     post_count = int(bres.get("written") or 0)
     choice = args.embed or ("skip" if args.yes else "")
+    test = None   # cached local-embedding test (deps + micro-bench); reused if accepted
     if not choice:
         say("smart_offer")
         say("hw_gpu", name=hw["name"]) if hw["gpu"] else say("hw_cpu")
-        default = "1" if hw["recommend"] == "local" else "2"
+        # The default comes from the hardware test, not a static guess: a GPU is
+        # reliably fast (default local); a capable CPU is uncertain, so we actually
+        # install + micro-benchmark the model on this archive and default to local
+        # only if it's fast enough; weak hardware defaults to skip (browse now,
+        # enable a key in-app later) — Enter-through never demands an API key.
+        default = "3"
+        if hw["gpu"]:
+            default = "1"
+        elif hw["recommend"] == "local":
+            say("microbench")
+            test = wiz.test_local(p["spaces"], post_count, hw)
+            if not test["deps"]:
+                say("install_fail")
+            elif not test["viable"]:
+                say("backoff_slow", min=test["est_min"])
+            default = "1" if test["viable"] else "3"
         try:
             pick = input(wiz.t(lang, "choose_embed", d=default)).strip() or default
         except EOFError:
-            pick = "3"
+            pick = default
         choice = {"1": "local", "2": "gemini", "3": "skip"}.get(pick, "skip")
 
     if choice == "local":
-        rec = wiz.recommend_embed(hw)              # curated registry: which model fits
-        model, gpu = rec["model"], hw["gpu"]
-        say("installing_local")
-        if not wiz.ensure_local_deps(gpu):
-            say("install_fail")
-        else:
-            say("microbench")                      # tiny empirical probe before the long run
-            sample = wiz.sample_corpus(p["spaces"], n=16)
-            mb = wiz.micro_benchmark(model, sample) if sample else {"ok": True, "tps": 50, "peak_mb": 0}
-            viable, est_min = wiz.embed_viable(mb, post_count, hw.get("available_mb", 0))
-            if viable:
-                wiz.spawn_background_embed(home, "local", device="gpu" if gpu else "", model=model)
-                say("embed_started_est", min=est_min)
-            else:
-                say("backoff_slow", min=est_min)   # too slow / OOM-risk → steer to a key
+        if test is None:                           # GPU default, or a manual override → test now
+            say("installing_local")
+            test = wiz.test_local(p["spaces"], post_count, hw)
+            if not test["deps"]:
+                say("install_fail")
+        if test.get("viable"):
+            wiz.spawn_background_embed(home, "local", device="gpu" if hw["gpu"] else "",
+                                       model=test["model"])
+            say("embed_started_est", min=test.get("est_min", 0))
+        elif test.get("deps"):
+            say("backoff_slow", min=test.get("est_min", 0))   # too slow / OOM-risk → steer to a key
     elif choice == "gemini":
         from .embed import gemini_key
         from . import providers

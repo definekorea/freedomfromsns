@@ -32,8 +32,9 @@ if [ -n "${FFS_SOURCE:-}" ]; then
 elif [ -f "$SCRIPT_DIR/pyproject.toml" ]; then
   SOURCE="$SCRIPT_DIR"
 else
-  echo "Finding the latest FreedomFromSNS release…"
-  SOURCE=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" \
+  echo "Finding the newest FreedomFromSNS release…"
+  # Use the releases LIST (newest first) — /releases/latest can lag or mis-rank.
+  SOURCE=$(curl -fsSL "https://api.github.com/repos/$REPO/releases" \
            | grep -o 'https://[^"]*\.whl' | head -1)
   [ -n "$SOURCE" ] || { echo "No release wheel found for $REPO — has a release been published?"; exit 1; }
 fi
