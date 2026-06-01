@@ -25,7 +25,7 @@ _GEM = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generate
 _IMG = re.compile(r"!\[([^\]]*)\]\(([^)\s]+)\)")
 _VID = re.compile(r"\[▶[^\]]*\]\(([^)\s]+)\)")
 _LINK = re.compile(r"🔗 \[([^\]]+)\]\((https?://[^)\s]+)\)")
-_MARKUP = ("#", "![", "🔗", "[▶", "📍")
+_MARKUP = ("#", "![", "🔗", "[▶", "📍", "📘")
 _MAX_STEPS = 8
 
 _SYS = (

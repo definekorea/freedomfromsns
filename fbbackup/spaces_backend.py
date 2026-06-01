@@ -264,7 +264,7 @@ class SpacesBackend:
                     # a pure reshare, OR a one-liner whose only text just repeats
                     # the title — and no media/link/video to look at.
                     text_lines = [s for line in body.splitlines()
-                                  if (s := line.strip()) and not s.startswith(("#", "![", "🔗", "[▶", "📍"))]
+                                  if (s := line.strip()) and not s.startswith(("#", "![", "🔗", "[▶", "📍", "📘"))]
                     text_content = " ".join(" ".join(text_lines).split())
                     has_visual = ("![" in body) or ("🔗" in body) or ("[▶" in body)
                     trivial = (not text_content) or (text_content == " ".join(title.split()))

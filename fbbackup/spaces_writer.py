@@ -93,6 +93,11 @@ def post_to_row(post: dict, source: str = "facebook-export") -> tuple[str, str]:
         lines.append(f"🔗 [{_label(l['name']) or l['url']}]({l['url']})")
     if post["place"] and post["place"]["name"]:
         lines.append(f"📍 {post['place']['name']}")
+    # The post's own Facebook permalink (reshares whose original the export drops
+    # — opening it on Facebook shows the reshared original). Marked with 📘 so the
+    # viewer renders it as a clean "view on Facebook" button (no web unfurl).
+    if post.get("fb_url"):
+        lines.append(f"📘 [Facebook에서 보기]({post['fb_url']})")
 
     fm = yaml.safe_dump(props, sort_keys=False, allow_unicode=True).strip("\n")
     body = "\n".join(lines).rstrip("\n") + "\n"

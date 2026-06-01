@@ -36,7 +36,7 @@ DEFAULT_MODEL = os.environ.get("FFS_CHAT_MODEL", "gemini-2.5-flash")
 # are already `/api/fb/files?path=…` URLs; links are `🔗 [name](http…)`.
 _IMG = re.compile(r"!\[([^\]]*)\]\(([^)\s]+)\)")
 _VID = re.compile(r"\[▶[^\]]*\]\(([^)\s]+)\)")
-_MARKUP = ("#", "![", "🔗", "[▶", "📍")
+_MARKUP = ("#", "![", "🔗", "[▶", "📍", "📘")
 
 _CHAT_SYS = (
     "당신은 사용자 본인의 페이스북 기록 보관소(아카이브)와 대화하는 AI입니다. 매 turn마다 "

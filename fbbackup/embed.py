@@ -229,7 +229,7 @@ def _content(text: str) -> str:
         if s.startswith("# ") and not title:
             title = s[2:].strip()
             continue
-        if s.startswith(("#", "![", "🔗", "[▶", "📍")):
+        if s.startswith(("#", "![", "🔗", "[▶", "📍", "📘")):
             continue
         lines.append(s)
     content = " ".join(" ".join(lines).split())

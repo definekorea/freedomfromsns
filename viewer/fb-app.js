@@ -7,7 +7,7 @@
 (function () {
   "use strict";
   var CFG = window.FFS || {};
-  var TYPE = { photo: "사진", video: "영상", link: "링크", status: "글" };
+  var TYPE = { photo: "사진", video: "영상", link: "링크", status: "글", share: "공유" };
   var MON = "일월화수목금토".split("");
   var PAGE = 60;
 
@@ -81,7 +81,7 @@
   function renderFilters() {
     els.filters.innerHTML = "";
     if (S.view !== "browse") return;
-    ["all", "photo", "video", "link", "status"].forEach(function (t) {
+    ["all", "photo", "video", "link", "share", "status"].forEach(function (t) {
       var c = el("button", "fb-chip" + (S.type === t ? " on" : ""), t === "all" ? "전체" : TYPE[t]);
       c.dataset.t = t; c.onclick = function () { S.type = t; S.shown = PAGE; renderBrowse(); };
       els.filters.appendChild(c);
@@ -195,7 +195,7 @@
     var c = el("div", "fb-card"); c.onclick = function () { openPost(p.id); };
     var thumb;
     if (p.thumb) { thumb = el("div", "fb-thumb"); var im = el("img"); im.loading = "lazy"; im.src = p.thumb; im.onerror = function () { thumb.classList.add("ph"); thumb.dataset.ic = "▦"; im.remove(); }; thumb.appendChild(im); }
-    else { thumb = el("div", "fb-thumb ph"); thumb.dataset.ic = p.type === "video" ? "▶" : p.type === "link" ? "🔗" : "▦"; }
+    else { thumb = el("div", "fb-thumb ph"); thumb.dataset.ic = p.type === "video" ? "▶" : p.type === "link" ? "🔗" : p.type === "share" ? "↻" : "▦"; }
     var badge = el("div", "fb-badge " + p.type, TYPE[p.type] || "글"); thumb.appendChild(badge);
     c.appendChild(thumb);
     var body = el("div", "fb-body");
@@ -389,8 +389,14 @@
         var md = (obj.content_markdown || "")
           .replace(/^---\n[\s\S]*?\n---\n+/, "")
           .replace(/^#\s+.*\n+/, "");
+        // pull out local videos ([▶ caption](/api/fb/files…mp4)) — they're
+        // relative URLs the link renderer skips, so render them as real <video>
+        // players below instead of leaking raw markdown.
+        var vids = [];
+        md = md.replace(/\[▶[^\]]*\]\((\/api\/fb\/files[^)\s]+)\)/g, function (_, u) { vids.push(u); return ""; });
         content.innerHTML = mdToHtml(md);
         body.appendChild(content);
+        vids.forEach(function (u) { var v = el("video", "fb-doc-vid"); v.src = u; v.controls = true; v.preload = "metadata"; v.playsInline = true; content.appendChild(v); });
         var imgs = content.querySelectorAll("img.fb-md-img");
         var media = []; imgs.forEach(function (im) { media.push({ url: im.getAttribute("src"), type: "image", post_id: id, post_title: obj.title || "" }); });
         imgs.forEach(function (im, ix) { im.style.cursor = "zoom-in"; im.onclick = function () { openLightbox(media, ix); }; });
@@ -438,7 +444,10 @@
     if (!CFG.unfurl) return;
     var seen = {}, urls = [];
     content.querySelectorAll('a[href^="http"]').forEach(function (a) {
-      var u = a.getAttribute("href"); if (u && !seen[u]) { seen[u] = 1; urls.push(u); }
+      var u = a.getAttribute("href");
+      // Facebook blocks scraping → unfurl always fails; the inline 📘 "Facebook에서
+      // 보기" link already opens the original, so don't add a dead preview card.
+      if (u && !seen[u] && !/(^|\.)facebook\.com/.test(u)) { seen[u] = 1; urls.push(u); }
     });
     if (!urls.length) return;
     var wrap = el("div", "fb-prev-wrap"); content.appendChild(wrap);
