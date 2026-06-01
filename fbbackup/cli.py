@@ -7,6 +7,7 @@
     fbbackup index     parse + build + embed  (the whole pipeline, one command)
     fbbackup serve     run the standalone timeline viewer
     fbbackup share     expose the running dashboard via a Cloudflare quick tunnel
+    fbbackup tunnel     permanent public address via a Cloudflare named tunnel
     fbbackup export-static  index → a self-contained static site (browse + keyword)
     fbbackup publish   deploy a static export to a free host (GitHub/Cloudflare/…)
     fbbackup status     what's present (export? index? rows? embeddings?)
@@ -323,6 +324,78 @@ def cmd_setup(args) -> int:
     return 0
 
 
+def cmd_tunnel(args) -> int:
+    """Set up a PERMANENT public address via a Cloudflare named tunnel (stable URL
+    on your own domain, survives restarts). Scriptable parts are automated; the
+    one-time browser login + Cloudflare account/domain are guided. Writes a
+    dedicated ~/ffs/cloudflared.yml — never touches an existing ~/.cloudflared
+    config. Use `ffs share` / the 🌐 button for a quick, no-account link instead."""
+    from fbbackup import setup as wiz
+    from fbbackup import tunnel as tn
+
+    home = _home()
+    os.environ["FBBACKUP_HOME"] = str(home)
+    lang = args.lang or wiz.detect_lang()
+
+    def say(key, **kw):
+        print(wiz.t(lang, key, **kw), flush=True)
+
+    if not tn.cloudflared():
+        say("tn_need_cf")
+        print("  https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/")
+        return 2
+    say("tn_intro")
+
+    if not tn.is_logged_in():
+        say("tn_login")
+        if not args.dry_run:
+            subprocess.call([tn.cloudflared(), "tunnel", "login"])
+        if not tn.is_logged_in():
+            say("tn_login_fail")
+            return 2
+
+    host = args.hostname
+    if not host:
+        try:
+            host = input(wiz.t(lang, "tn_ask_host")).strip()
+        except EOFError:
+            host = ""
+    if not host:
+        return 2
+
+    name = args.name or "freedomfromsns"
+    p = _paths(args)
+    port = int(args.port or (p["cfg"].get("serve", {}) or {}).get("port", 8282))
+    cfg_path = home / "cloudflared.yml"
+
+    if args.dry_run:
+        say("tn_plan")
+        for c in (["cloudflared", "tunnel", "create", name],
+                  ["cloudflared", "tunnel", "route", "dns", name, host],
+                  ["# write config →", str(cfg_path)],
+                  tn.run_command(home, name)):
+            print("   $ " + " ".join(c))
+        return 0
+
+    t = tn.tunnel_by_name(name) or tn.create_tunnel(name)
+    if not t or not tn.tunnel_id(t):
+        say("tn_create_fail")
+        return 2
+    say("tn_route", host=host)
+    if not tn.route_dns(name, host):
+        say("tn_route_fail", host=host)
+        return 2
+    cfg = tn.write_config(home, tn.tunnel_id(t), host, port)
+    say("tn_ready", host=host, cfg=str(cfg))
+    say("tn_run_hint")
+    print("   $ " + " ".join(tn.run_command(home, name)))
+    say("tn_service", cfg=str(cfg))
+    if args.run:
+        say("tn_running")
+        return subprocess.call(tn.run_command(home, name))
+    return 0
+
+
 def cmd_share(args) -> int:
     """Expose a locally-running server publicly via a Cloudflare quick tunnel
     (no account, ephemeral *.trycloudflare.com URL)."""
@@ -503,6 +576,15 @@ def _build_parser() -> argparse.ArgumentParser:
     sh = sub.add_parser("share", help="Cloudflare quick tunnel to a running server")
     sh.add_argument("--port", default="9119", help="local port to expose (default 9119)")
 
+    tn = sub.add_parser("tunnel", help="permanent public address via a Cloudflare named tunnel")
+    tn.add_argument("hostname", nargs="?", help="the address you want (e.g. archive.yourname.com)")
+    tn.add_argument("--name", help="tunnel name (default: freedomfromsns)")
+    tn.add_argument("--port", help="local port to expose (default: serve port / 8282)")
+    tn.add_argument("--lang", choices=["en", "ko"], help="language (default: OS locale)")
+    tn.add_argument("--run", action="store_true", help="run the tunnel after setup")
+    tn.add_argument("--dry-run", action="store_true", help="print the steps without creating anything")
+    common(tn, index=True)
+
     ex = sub.add_parser("export-static", help="index → self-contained static site")
     common(ex, index=True)
     ex.add_argument("--out", help="output dir (default: static-site)")
@@ -524,7 +606,7 @@ def _build_parser() -> argparse.ArgumentParser:
 _DISPATCH = {
     "setup": cmd_setup,
     "parse": cmd_parse, "build": cmd_build, "embed": cmd_embed, "index": cmd_index,
-    "serve": cmd_serve, "share": cmd_share, "status": cmd_status, "doctor": cmd_doctor,
+    "serve": cmd_serve, "share": cmd_share, "tunnel": cmd_tunnel, "status": cmd_status, "doctor": cmd_doctor,
     "export-static": cmd_export_static, "publish": cmd_publish,
 }
 

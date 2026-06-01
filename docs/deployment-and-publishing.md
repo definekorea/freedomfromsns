@@ -325,8 +325,12 @@ Reordered around the §0.1 ladder: **ship Tier 0 the fastest, make AI an unlock.
    that reshares are mostly missing, then starts a **Cloudflare quick tunnel**
    (`/api/publish/start|stop|status`, loopback-only, isolated config home) and
    shows the temporary URL with copy + stop. (M) — done. *(First-run tour still TODO.)*
-9. **Named-tunnel helper** (`ffs publish --target cloudflare-tunnel`) that scripts
-   Level 2 + writes a `config.yml` + optional service install. (M)
+9. ✅ **Named-tunnel helper** — `ffs tunnel <hostname>`: guided, bilingual. Automates
+   the scriptable Level-2 steps (`tunnel create` → `route dns` → write a **dedicated**
+   `~/ffs/cloudflared.yml` → run) and guides the parts that can't be scripted (the
+   one-time `cloudflared tunnel login` + registering a free Cloudflare account/domain).
+   `--dry-run` prints the plan; `--run` starts it; suggests `service install` for
+   always-on. Never touches an existing `~/.cloudflared/config.yml`. (M) — done.
 10. **Dockerfile + compose** for always-on. (S)
 
 ---

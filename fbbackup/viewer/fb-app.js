@@ -56,7 +56,7 @@
       pub_live: "이제 이 주소로 누구나 볼 수 있어요:", pub_stop: "공개 중지", pub_stopped: "공개를 중지했습니다.",
       pub_copy: "복사", pub_copied: "복사됨 ✓",
       pub_need_cf: "공개하려면 cloudflared가 필요합니다. 설치 안내:",
-      pub_note: "이 컴퓨터와 앱이 켜져 있는 동안만 작동하는 임시 주소이며, 재시작하면 바뀝니다. (고정 주소는 곧 지원 예정)",
+      pub_note: "이 컴퓨터와 앱이 켜져 있는 동안만 작동하는 임시 주소이며, 재시작하면 바뀝니다. 내 도메인의 고정 주소를 원하면 터미널에서 `ffs tunnel` 실행(무료 Cloudflare 계정 + 도메인 필요).",
     },
     en: {
       archive: "Archive", browse: "Browse", calendar: "Calendar", aichat: "✦ AI Chat",
@@ -98,7 +98,7 @@
       pub_live: "Anyone with this link can now view your archive:", pub_stop: "Stop sharing", pub_stopped: "Sharing stopped.",
       pub_copy: "Copy", pub_copied: "Copied ✓",
       pub_need_cf: "Publishing needs cloudflared. Install it:",
-      pub_note: "A temporary link that works only while this computer and app are running, and changes on restart. (A stable address is coming soon.)",
+      pub_note: "A temporary link that works only while this computer and app are running, and changes on restart. For a stable address on your own domain, run `ffs tunnel` in a terminal (needs a free Cloudflare account + a domain).",
     },
   };
   function tr(k) { var d = I18N[S.lang] || I18N.ko; return k in d ? d[k] : (I18N.ko[k] != null ? I18N.ko[k] : k); }

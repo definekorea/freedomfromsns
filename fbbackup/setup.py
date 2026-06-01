@@ -58,6 +58,23 @@ STRINGS: dict[str, dict[str, str]] = {
         "embed_started": "Building the smart-search index in the background (see embed.log) "
                          "— browse while it runs.",
         "embed_skip": "Skipped. You can enable smart search & chat anytime in the app.",
+        "tn_need_cf": "A permanent address needs cloudflared. Install it:",
+        "tn_intro":  "A permanent address lives on your own domain (e.g. archive.yourname.com) and "
+                     "survives restarts. You need a FREE Cloudflare account and a domain whose DNS "
+                     "is on Cloudflare. (Don't have one? Register a cheap domain and add it to "
+                     "Cloudflare's free plan — https://dash.cloudflare.com/sign-up)",
+        "tn_login":  "Opening a browser to log in to Cloudflare — pick the domain you added…",
+        "tn_login_fail": "Not logged in to Cloudflare — run `ffs tunnel` again after logging in.",
+        "tn_ask_host": "Enter the address you want (e.g. archive.yourname.com): ",
+        "tn_plan":   "Dry run — these steps would run (nothing changed):",
+        "tn_create_fail": "Couldn't create the tunnel. Check your Cloudflare login and try again.",
+        "tn_route":  "Pointing {host} at your tunnel…",
+        "tn_route_fail": "Couldn't route DNS — is {host}'s domain on your Cloudflare account?",
+        "tn_ready":  "✓ Permanent address ready: https://{host}  (config: {cfg})",
+        "tn_run_hint": "Start it any time with — keep it running for the address to work:",
+        "tn_running": "Running the tunnel now (Ctrl-C to stop)…",
+        "tn_service": "For an always-on address (survives reboots), install it as a service: "
+                      "`cloudflared --config {cfg} service install`.",
         "opening":   "Opening your archive at {url} …",
         "lang_prompt": "Language / 언어 — [1] English  [2] 한국어 (default {d}): ",
         "no_posts":  "No posts found in that export. Make sure you downloaded "
@@ -100,6 +117,23 @@ STRINGS: dict[str, dict[str, str]] = {
         "embed_started": "백그라운드에서 스마트 검색 색인을 만드는 중입니다(embed.log) "
                          "— 그 사이 자유롭게 둘러보세요.",
         "embed_skip": "건너뛰었습니다. 스마트 검색·AI 대화는 언제든 앱에서 켤 수 있어요.",
+        "tn_need_cf": "고정 주소를 만들려면 cloudflared가 필요합니다. 설치:",
+        "tn_intro":  "고정 주소는 내 도메인(예: archive.yourname.com)으로 제공되며 재시작해도 "
+                     "유지됩니다. **무료 Cloudflare 계정**과 **DNS가 Cloudflare에 등록된 도메인**이 "
+                     "필요합니다. (없다면 저렴한 도메인을 사서 Cloudflare 무료 플랜에 추가하세요 — "
+                     "https://dash.cloudflare.com/sign-up)",
+        "tn_login":  "Cloudflare 로그인을 위해 브라우저를 엽니다 — 추가해 둔 도메인을 선택하세요…",
+        "tn_login_fail": "Cloudflare에 로그인되지 않았습니다 — 로그인 후 `ffs tunnel`을 다시 실행하세요.",
+        "tn_ask_host": "원하는 주소를 입력하세요(예: archive.yourname.com): ",
+        "tn_plan":   "미리보기 — 아래 단계가 실행됩니다(아무것도 바꾸지 않음):",
+        "tn_create_fail": "터널을 만들지 못했습니다. Cloudflare 로그인 상태를 확인하고 다시 시도하세요.",
+        "tn_route":  "{host} 주소를 터널에 연결하는 중…",
+        "tn_route_fail": "DNS 연결에 실패했습니다 — {host}의 도메인이 내 Cloudflare 계정에 있나요?",
+        "tn_ready":  "✓ 고정 주소 준비 완료: https://{host}  (설정: {cfg})",
+        "tn_run_hint": "다음 명령으로 실행하세요 — 주소가 작동하려면 켜져 있어야 합니다:",
+        "tn_running": "지금 터널을 실행합니다(Ctrl-C로 중지)…",
+        "tn_service": "재부팅에도 항상 켜두려면 서비스로 설치하세요: "
+                      "`cloudflared --config {cfg} service install`.",
         "opening":   "{url} 에서 기록을 엽니다…",
         "lang_prompt": "Language / 언어 — [1] English  [2] 한국어 (기본 {d}): ",
         "no_posts":  "그 내보내기에서 게시물을 찾지 못했습니다. 페이스북에서 "
