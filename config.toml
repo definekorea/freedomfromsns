@@ -1,0 +1,12 @@
+# FreedomFromSNS — local Facebook-archive browser. Paths use forward slashes.
+[export]
+# Root of the unzipped Facebook JSON download (READ-ONLY; never modified).
+root = "/mnt/d/dev/facebook-data"
+[output]
+dir = "index"
+[gemini]
+# Chat model is selectable in the UI (flash ⇄ pro); this is the default.
+chat_model = "gemini-2.5-flash"
+[serve]
+host = "127.0.0.1"
+port = 8282

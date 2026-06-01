@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FreedomFromSNS — 내 페이스북 아카이브</title>
+  <link rel="preload" as="font" type="font/woff2" href="/static/fonts/PretendardVariable.woff2?v=2" crossorigin>
+  <link rel="stylesheet" href="/static/fb-app.css">
+  <script>
+    // Local, Gemini-only archive browser. All endpoints are same-origin.
+    window.FFS = {
+      index: "/api/index",          // every post (browse/calendar render client-side)
+      search: "/api/search",        // POST {query} → {ids}
+      chat: "/api/chat",            // POST {messages,model} → {answer,sources,media,model}
+      object: "/api/fb/objects/",   // + id → post detail (markdown body)
+      site: "FreedomFromSNS",
+      models: ["gemini-2.5-flash", "gemini-3.1-pro-preview"],
+      defaultModel: "gemini-2.5-flash"
+    };
+  </script>
+</head>
+<body>
+  <script src="/static/fb-app.js"></script>
+</body>
+</html>

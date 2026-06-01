@@ -1,0 +1,13 @@
+/index/
+/spaces-data/
+.thumb-cache/
+.unfurl-cache/
+.env
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+venv/
+embed.log
+serve.log
+nohup.out
