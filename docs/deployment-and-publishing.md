@@ -337,6 +337,45 @@ Reordered around the §0.1 ladder: **ship Tier 0 the fastest, make AI an unlock.
    `--dry-run` prints the plan; `--run` starts it; suggests `service install` for
    always-on. Never touches an existing `~/.cloudflared/config.yml`. (M) — done.
 10. **Dockerfile + compose** for always-on. (S)
+11. **Hardware tester v2** — upgrade the Phase-A probe into the three-layer tester
+    (static probe → tiny **micro-benchmark in a subprocess** → runtime back-off), because
+    static specs mislead (a 130 MB model OOM-killed a box with 43 GB free). It picks the
+    `(embedding model, chat option, batch size)` combo, and **backs off to a cloud key**
+    when the micro-bench or the live embed underperforms. Design + measured data in
+    [`local-models.md`](local-models.md). (M)
+12. **Mobile** — see the Mobile section below. (L)
+
+---
+
+## 8. Mobile (future)
+
+Two distinct goals; treat them separately.
+
+### 8a. Mobile **browsing** (near-term) 🔜
+The published archive (and the local server on a phone's browser) should be fully usable
+on a small screen. Work:
+- **Mobile UI/UX audit** of the viewer — responsive grid/calendar, touch targets, the
+  lightbox + thumb-strip scrubber and the chat panel on narrow screens, safe-area insets.
+- Make the viewer an installable **PWA** (manifest + service worker for an offline shell),
+  so a published archive can be "added to home screen." Browsing is static-friendly, so
+  this pairs naturally with `ffs export-static` + the Publish flow.
+
+### 8b. On-device **hosting + processing** (ambitious, long-term) 🔭
+Running parse → build → embed → serve *on the phone itself*, not just browsing. The
+small-model findings make pieces of this plausible:
+- **Embeddings on-device:** the winning CPU model (`paraphrase-multilingual-MiniLM-L12-v2`,
+  86 texts/s, 0.75 GB) is mobile-sized; run via **onnxruntime-mobile / CoreML / NNAPI**.
+- **Chat on-device:** ternary/4-bit models already run on phones (PrismML **Ternary Bonsai**
+  ~27 tok/s on an iPhone 17 Pro Max; see [`local-models.md`](local-models.md)) via
+  llama.cpp / MLC / a BitNet runtime.
+- **The hard part is the stack, not the models:** FastAPI/uvicorn + the Python pipeline
+  don't run natively on iOS/Android. Realistic paths, cheapest first: (1) **run the server
+  on a home machine, browse on mobile** (already works via Publish); (2) **Android via
+  Termux** running the existing app; (3) a **native/React-Native shell + embedded ONNX/LLM
+  runtimes** for a true on-device app (large effort — its own project).
+- Sequencing: (1) the mobile UI/UX audit + PWA for browsing → (2) research on-device
+  runtimes → (3) on-device processing. The **hardware tester** (item 11) is the gate that
+  decides what a given phone can actually do.
 
 ---
 

@@ -24,7 +24,8 @@ relevant since our index is a flat `.npy` we load into RAM.
 
 | Model | Params | Why it fits us | Notes |
 |---|---|---|---|
-| **Nomic Embed v1.5** | 137M | tiny, **8K context** (rare under 500M), MRL, fully open | likely the best default-swap; in fastembed |
+| **Nomic Embed v1.5** | 137M | tiny, **8K context** (rare under 500M), MRL, fully open | ⚠️ measured: OOMs at default batch + slow on CPU — *not* the CPU default (see tester table) |
+| **MiniLM-L12 multilingual** (measured winner) | ~118M | 384-dim, multilingual KO+EN, fast on CPU | **the no-GPU default** per benchmarks below |
 | **EmbeddingGemma** | 300M | MRL, strong **multilingual (100+)** — matches our KO+EN data | check fastembed/ONNX availability |
 | **BGE-M3** | 560M | **hybrid** dense + sparse(BM25-like) + ColBERT in one pass; multilingual | heavier; enables hybrid search later |
 
@@ -73,10 +74,83 @@ for everyone" without changing the architecture. Adopt behind the same
 GPU-aware, skippable choice (Phase A), default to the safest option, and never
 auto-download heavyweight models without the user picking it.
 
+## The hardware tester — quick, reliable, and self-correcting
+
+**Why this is now central.** Static specs *lie*. Measured on an 8-vCPU / 48 GB / no-GPU
+box (WSL):
+
+Measured via fastembed on an **8-vCPU / 48 GB / no-GPU** box (WSL), 150 real KO+EN
+posts; "~24k" extrapolates to this archive's 24,346 posts:
+
+| Model | Download | dim | CPU tps | Peak RAM | ~24k posts | No-GPU verdict |
+|---|---|---|---|---|---|---|
+| `paraphrase-multilingual-MiniLM-L12-v2` | 240 MB | 384 | **86.5** | 0.75 GB | **~4.7 min** | ✅ the default — multilingual, fast, light |
+| `bge-small-en-v1.5` | 65 MB | 384 | 15.2 | 0.86 GB | ~27 min | English-only → weak for Korean |
+| `nomic-embed-text-v1.5` | 130 MB | 768 | 4.1 (bs≤8) | 4.6 GB | ~1.6 h | ⚠️ **OOM-killed at default batch** (8K-ctx padding); slow |
+| `intfloat/multilingual-e5-large` | 2.24 GB | 1024 | 2.8 | 2.3 GB | ~2.4 h | GPU or cloud key only |
+| `jinaai/jina-embeddings-v3` (current class) | 2.29 GB | 1024 | 1.9 | 6.9 GB | ~3.5 h | GPU or cloud key only |
+
+Two findings that no static heuristic predicts:
+1. The 130 MB `nomic` **OOM-killed a process with 43 GB free** — its 8K context makes
+   onnxruntime pad to enormous batches at the default batch size.
+2. The 1024-dim multilingual heavyweights are **30–45× slower on CPU** (3.5 h vs ~5 min) —
+   download size and params don't tell you this; only a real run does.
+
+**Conclusions:** (a) on a no-GPU machine the only practical local embedder is a small
+384-dim multilingual model — **switch the local default to `paraphrase-multilingual-
+MiniLM-L12-v2`** (the speculative "Nomic is best" earlier in §1 is *wrong* on CPU); the
+1024-dim models are for GPUs or the cloud-key path (which embeds via API, instant). (b) a
+tiny real **micro-benchmark is the only reliable signal**, and the system must **back off**
+when reality underperforms.
+
+### Design — three layers
+
+**1. Static probe (instant, < 50 ms) → a first guess.**
+- CPU: logical + **physical** cores, and **ISA flags (AVX2 / AVX-512)** — these dominate
+  onnxruntime CPU speed. Read `/proc/cpuinfo` (Linux), `sysctl machdep.cpu` (mac),
+  registry/`platform` (Win).
+- **Available** RAM, not total (`MemAvailable` in `/proc/meminfo`; `GlobalMemoryStatusEx`
+  via ctypes on Win; `vm_stat` on mac). This is the load-bearing number.
+- Accelerator: the best signal is **`onnxruntime.get_available_providers()`** (tells if
+  CUDA / CoreML / DirectML is *actually usable*, not just present) + `nvidia-smi` for
+  NVIDIA name/VRAM + Apple-Silicon detection. Disk free for downloads.
+
+**2. Micro-benchmark (the reliable part, ~3–8 s, hard-timeout).**
+- Load the smallest viable model once; embed a fixed **16–32 text sample (incl. one long
+  one)** at a *safe small batch*; measure throughput + peak RSS **in a subprocess** (so an
+  OOM/crash can't take down the wizard, and RSS is isolated — we learned this the hard way).
+- Extrapolate: `projected_embed_time = corpus_size / tps`; `projected_peak_RAM` at the
+  intended batch. Decide: **local** only if `projected_time` is acceptable **and**
+  `projected_peak_RAM < ~0.6 × available`; else **back off** to a cloud key (or a
+  smaller/faster model, or a smaller batch). A micro-bench that exceeds its timeout =
+  "too slow" → back off.
+
+**3. Runtime back-off (during the real background embed).**
+- Pick `batch_size` from available RAM; **clamp hard for long-context models** (never the
+  library default). 
+- Watchdog on the resumable embed: if the rate is far below the micro-bench estimate, or
+  the process is OOM-killed/stalls, surface *"Smart search is slow on your hardware —
+  switch to a free key?"* (keyword search already works; embed is resumable + provider-
+  tagged, so switching re-embeds cleanly).
+
+### Best-practice notes for the quick test
+- Cache the result keyed by a hardware fingerprint — don't re-run every launch.
+- Always run probes/benches in a **subprocess with a timeout** (crash isolation).
+- Browse + keyword search **never** depend on any of this — that's the floor that always works.
+- The same micro-bench pattern decides **local chat** feasibility (tok/s on a tiny prompt)
+  before offering a local chat model.
+
+## Mobile (future) — see deployment doc
+
+Browsing on mobile + eventually on-device hosting/processing is a roadmap item; the
+plan lives in `deployment-and-publishing.md` (Mobile section). The hardware tester +
+small-model findings above are the foundation for the on-device-processing question.
+
 ## Build order (when pursued)
 
-1. **Swap the local embedding default** to Nomic v1.5 (verify fastembed/ONNX);
-   expose a small picker; use MRL truncation for large archives. (S)
+1. **Swap the local embedding default** to `paraphrase-multilingual-MiniLM-L12-v2`
+   (measured winner on CPU — see the hardware-tester table; *not* Nomic). Keep the
+   1024-dim models as a GPU-only option; expose a small picker. (S)
 2. **Local chat (Ollama / 4-bit GGUF)** as a third Phase-A chat option; RAG-only
    synthesis through it; bundle/guide the runtime. (M)
 3. **Ternary Bonsai 1.7B** once a packaged cross-OS ternary runtime exists. (M, later)
