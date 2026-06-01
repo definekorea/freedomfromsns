@@ -7,9 +7,60 @@
 (function () {
   "use strict";
   var CFG = window.FFS || {};
-  var TYPE = { photo: "사진", video: "영상", link: "링크", status: "글", share: "공유", uncat: "미분류" };
-  var MON = "일월화수목금토".split("");
   var PAGE = 60;
+
+  /* ── i18n (KO / EN) ──────────────────────────────────────────────────── */
+  var I18N = {
+    ko: {
+      archive: "아카이브", browse: "둘러보기", calendar: "달력", aichat: "✦ AI 대화",
+      search_ph: "검색…", all: "전체", year_all: "모든 연도", load_fail: "콘텐츠를 불러오지 못했습니다.",
+      type_photo: "사진", type_video: "영상", type_link: "링크", type_status: "글", type_share: "공유", type_uncat: "미분류",
+      mon: "일월화수목금토", months: "1월 2월 3월 4월 5월 6월 7월 8월 9월 10월 11월 12월",
+      related_searching: "  ·  관련 글 찾는 중…", semantic: "  ·  의미 검색",
+      searching: "검색 중…", no_results: "결과가 없습니다.", no_results2: "결과 없음",
+      close: "닫기", view_original: "원문 보기 ↗", loading: "불러오는 중…",
+      load_body_fail: "본문을 불러올 수 없습니다.", related: "관련 글", link_preview: "링크 미리보기…",
+      source_fallback: "원본", lb_goto: "위치로 이동", original_short: "원문 ↗", untitled: "(무제)",
+      chat_hi: "✦ 내 기록과 대화하기",
+      chat_sub: "내 페이스북 기록을 근거로 답합니다. 사진·영상도 함께 찾아 보여줘요. 무엇이든 물어보세요.",
+      chat_eg1: "내가 올린 여행 사진들 보여줘", chat_eg2: "내가 가장 많이 쓴 주제는?", chat_eg3: "2015년에 무슨 일이 있었지?",
+      chat_ph: "메시지를 입력하세요…  (Enter 전송 · Shift+Enter 줄바꿈)",
+      send: "전송", ai_model: "AI 모델", model_fast: "빠름 (Flash)", model_precise: "정밀 (Pro)",
+      tools: "🔧 도구", tools_title: "도구 사용(에이전트) — 기록을 직접 검색·열람해 더 정확히 답합니다",
+      clear_chat: "대화 지우기", sources: "근거 글",
+      copy: "복사", copied: "복사됨", copy_title: "답변 복사", regen: "다시", regen_title: "다시 생성",
+      del: "삭제", del_title: "이 질문·답변 삭제", no_response: "(응답 없음)",
+      err_busy: "요청이 많아요. 잠시 후 다시 시도해 주세요.", err_unavailable: "지금은 AI를 사용할 수 없어요. 잠시 후 다시 시도해 주세요.",
+    },
+    en: {
+      archive: "Archive", browse: "Browse", calendar: "Calendar", aichat: "✦ AI Chat",
+      search_ph: "Search…", all: "All", year_all: "All years", load_fail: "Couldn't load content.",
+      type_photo: "Photos", type_video: "Videos", type_link: "Links", type_status: "Text", type_share: "Shares", type_uncat: "Unsorted",
+      mon: "SMTWTFS", months: "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec",
+      related_searching: "  ·  finding related…", semantic: "  ·  semantic",
+      searching: "Searching…", no_results: "No results.", no_results2: "No results",
+      close: "Close", view_original: "View original ↗", loading: "Loading…",
+      load_body_fail: "Couldn't load the post.", related: "Related", link_preview: "Link preview…",
+      source_fallback: "Source", lb_goto: "Jump to position", original_short: "Original ↗", untitled: "(untitled)",
+      chat_hi: "✦ Chat with my archive",
+      chat_sub: "Answers grounded in your Facebook archive — it finds your photos and videos too. Ask anything.",
+      chat_eg1: "Show my travel photos", chat_eg2: "What did I write about most?", chat_eg3: "What happened in 2015?",
+      chat_ph: "Type a message…  (Enter to send · Shift+Enter for a new line)",
+      send: "Send", ai_model: "AI model", model_fast: "Fast (Flash)", model_precise: "Precise (Pro)",
+      tools: "🔧 Tools", tools_title: "Agent mode — searches and opens your posts directly for more accurate answers",
+      clear_chat: "Clear chat", sources: "Sources",
+      copy: "Copy", copied: "Copied", copy_title: "Copy answer", regen: "Retry", regen_title: "Regenerate",
+      del: "Delete", del_title: "Delete this Q&A", no_response: "(no response)",
+      err_busy: "Too many requests. Please try again shortly.", err_unavailable: "AI is unavailable right now. Please try again shortly.",
+    },
+  };
+  function tr(k) { var d = I18N[S.lang] || I18N.ko; return k in d ? d[k] : (I18N.ko[k] != null ? I18N.ko[k] : k); }
+  function typeLabel(t) { return tr("type_" + t) || tr("type_status"); }
+  var EN = function () { return S.lang === "en"; };
+  function countN(n) { return n.toLocaleString() + (EN() ? "" : "개"); }
+  function yearN(y) { return EN() ? "" + y : y + "년"; }
+  function moreN(n) { return EN() ? "+" + n + " more" : "+" + n + " 더보기"; }
+  function ymTitle(y, m) { return EN() ? tr("months").split(" ")[m - 1] + " " + y : y + "년 " + m + "월"; }
 
   var S = {                     // app state
     posts: [], related: {}, byId: {},
@@ -21,6 +72,7 @@
     chatBusy: false,
     semanticIds: null,          // semantic results for the current query (null = none/keyword)
     semanticLoading: false, searchToken: 0,
+    lang: (function () { try { return localStorage.getItem("ffs.lang") || (/^en/i.test(navigator.language || "") ? "en" : "ko"); } catch (e) { return "ko"; } })(),
     model: (function () { try { return localStorage.getItem("ffs.model") || (CFG.defaultModel || "gemini-2.5-flash"); } catch (e) { return CFG.defaultModel || "gemini-2.5-flash"; } })(),
     agent: (function () { try { var v = localStorage.getItem("ffs.agent"); return v === null ? true : v === "1"; } catch (e) { return true; } })(),
   };
@@ -39,21 +91,21 @@
     loadChat();
     routeFromHash();
     window.addEventListener("hashchange", routeFromHash);
-  }).catch(function () { els.main.innerHTML = '<div class="fb-empty">콘텐츠를 불러오지 못했습니다.</div>'; });
+  }).catch(function () { els.main.innerHTML = '<div class="fb-empty">' + tr("load_fail") + '</div>'; });
 
   /* ── chrome (header + filters) built once ───────────────────────────── */
   function buildChrome() {
     var top = el("div", "fb-top");
     var bar = el("div", "fb-bar");
-    var brand = el("div", "fb-brand"); brand.innerHTML = (CFG.site || "Unattached") + ' <small>아카이브</small>';
+    var brand = el("div", "fb-brand"); brand.innerHTML = (CFG.site || "Unattached") + ' <small>' + tr("archive") + '</small>';
     brand.style.cursor = "pointer"; brand.onclick = goHome;
 
     var tabs = el("div", "fb-tabs");
-    els.tabBrowse = el("button", "fb-tab", "둘러보기"); els.tabBrowse.onclick = goHome;
-    els.tabCal = el("button", "fb-tab", "달력"); els.tabCal.onclick = function () { location.hash = "#calendar" + (S.q ? "=" + encodeURIComponent(S.q) : ""); };
+    els.tabBrowse = el("button", "fb-tab", tr("browse")); els.tabBrowse.onclick = goHome;
+    els.tabCal = el("button", "fb-tab", tr("calendar")); els.tabCal.onclick = function () { location.hash = "#calendar" + (S.q ? "=" + encodeURIComponent(S.q) : ""); };
     tabs.appendChild(els.tabBrowse); tabs.appendChild(els.tabCal);
     if (CFG.chat) {
-      els.tabChat = el("button", "fb-tab fb-tab-ai", "✦ AI 대화"); els.tabChat.onclick = function () { location.hash = "#chat"; };
+      els.tabChat = el("button", "fb-tab fb-tab-ai", tr("aichat")); els.tabChat.onclick = function () { location.hash = "#chat"; };
       tabs.appendChild(els.tabChat);
     }
 
@@ -61,7 +113,7 @@
     // with semantic results (페르시아→이란) when the box answers. No Enter needed.
     var search = el("div", "fb-search");
     search.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>';
-    els.q = el("input"); els.q.type = "search"; els.q.placeholder = "검색…";
+    els.q = el("input"); els.q.type = "search"; els.q.placeholder = tr("search_ph");
     var deb;
     els.q.addEventListener("input", function () { clearTimeout(deb); deb = setTimeout(function () { doSearch(els.q.value.trim()); }, 300); });
     els.q.addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); clearTimeout(deb); doSearch(els.q.value.trim()); } });
@@ -84,7 +136,7 @@
     // Two groups: shown-by-default content, then a divider, then "click-into"
     // buckets (링크/공유/미분류) that are hidden from 전체 — you open them on demand.
     function chip(t, sec) {
-      var c = el("button", "fb-chip" + (sec ? " sec" : "") + (S.type === t ? " on" : ""), t === "all" ? "전체" : TYPE[t]);
+      var c = el("button", "fb-chip" + (sec ? " sec" : "") + (S.type === t ? " on" : ""), t === "all" ? tr("all") : typeLabel(t));
       c.dataset.t = t; c.onclick = function () { S.type = t; S.shown = PAGE; renderBrowse(); };
       return c;
     }
@@ -94,11 +146,30 @@
     els.filters.appendChild(el("div", "fb-sp"));
     var yrs = uniqueYears();
     var sel = el("select", "fb-year");
-    sel.appendChild(new Option("모든 연도", "all"));
-    yrs.forEach(function (y) { sel.appendChild(new Option(y + "년", y)); });
+    sel.appendChild(new Option(tr("year_all"), "all"));
+    yrs.forEach(function (y) { sel.appendChild(new Option(yearN(y), y)); });
     sel.value = S.year; sel.onchange = function () { S.year = sel.value; S.shown = PAGE; renderBrowse(); };
     els.filters.appendChild(sel);
     els.count = el("div", "fb-count"); els.filters.appendChild(els.count);
+    var lang = el("button", "fb-lang", EN() ? "🇰🇷 한국어" : "🇺🇸 English");
+    lang.title = EN() ? "한국어로 전환" : "Switch to English";
+    lang.onclick = function () { setLang(EN() ? "ko" : "en"); };
+    els.filters.appendChild(lang);
+  }
+
+  // Switch UI language in place: persist, re-label the once-built chrome, re-render.
+  function setLang(lang) {
+    S.lang = lang;
+    try { localStorage.setItem("ffs.lang", lang); } catch (e) {}
+    document.documentElement.lang = lang;
+    if (els.tabBrowse) els.tabBrowse.textContent = tr("browse");
+    if (els.tabCal) els.tabCal.textContent = tr("calendar");
+    if (els.tabChat) els.tabChat.textContent = tr("aichat");
+    if (els.q) els.q.placeholder = tr("search_ph");
+    var small = document.querySelector(".fb-brand small");
+    if (small) small.textContent = tr("archive");
+    renderFilters();
+    renderCurrentView();
   }
 
   function uniqueYears() { var s = {}; S.posts.forEach(function (p) { s[p.date.slice(0, 4)] = 1; }); return Object.keys(s).sort().reverse(); }
@@ -224,17 +295,17 @@
         thumb.appendChild(im);
         if (p.vid) thumb.appendChild(el("span", "fb-thumb-play", "▶"));
       } else { thumb.dataset.ic = "🔗"; }                 // link awaiting its preview
-      thumb.appendChild(el("div", "fb-badge " + p.type, TYPE[p.type] || "글"));
+      thumb.appendChild(el("div", "fb-badge " + p.type, typeLabel(p.type)));
       if (fill) thumb.appendChild(el("div", "fb-thumb-date", fmtDate(p.date)));
       c.appendChild(thumb);
     } else {
       c.classList.add("fb-card-text");                    // no visual → text takes over
-      c.appendChild(el("div", "fb-badge " + p.type + " float", TYPE[p.type] || "글"));
+      c.appendChild(el("div", "fb-badge " + p.type + " float", typeLabel(p.type)));
     }
     if (hasText || isLink || !hasImage) {
       body = el("div", "fb-body");
       body.appendChild(el("div", "fb-date", fmtDate(p.date)));
-      textEl = el("div", "fb-text", preview || (!hasImage ? (p.title || "(무제)") : ""));
+      textEl = el("div", "fb-text", preview || (!hasImage ? (p.title || tr("untitled")) : ""));
       // pretext-style fit (cheap, length-based): on a text-only card, a short post
       // reads large and fills the card; a long one shrinks so more of it fits.
       if (!hasImage) textEl.style.fontSize = fitFont(textEl.textContent.length);
@@ -266,11 +337,11 @@
     els.main.innerHTML = "";
     var list = filtered();
     if (els.count) {
-      var note = S.semanticLoading ? "  ·  관련 글 찾는 중…" : (S.semanticIds && S.q ? "  ·  의미 검색" : "");
-      els.count.textContent = list.length.toLocaleString() + "개" + note;
+      var note = S.semanticLoading ? tr("related_searching") : (S.semanticIds && S.q ? tr("semantic") : "");
+      els.count.textContent = countN(list.length) + note;
     }
     if (!list.length) {
-      els.main.appendChild(el("div", "fb-empty", S.semanticLoading ? "검색 중…" : "결과가 없습니다."));
+      els.main.appendChild(el("div", "fb-empty", S.semanticLoading ? tr("searching") : tr("no_results")));
       return;
     }
     var grid = el("div", "fb-grid");
@@ -296,9 +367,9 @@
     }
     els.main.innerHTML = "";
     if (S.q) {
-      els.main.appendChild(el("div", "fb-cal-search", "‘" + S.q + "’ 검색" +
-        (S.semanticLoading ? "  ·  관련 글 찾는 중…" : (S.semanticIds ? "  ·  의미 검색" : "")) +
-        "  —  " + posts.length.toLocaleString() + "개"));
+      els.main.appendChild(el("div", "fb-cal-search", (EN() ? "\u201c" + S.q + "\u201d search" : "\u2018" + S.q + "\u2019 \uac80\uc0c9") +
+        (S.semanticLoading ? tr("related_searching") : (S.semanticIds ? tr("semantic") : "")) +
+        "  —  " + countN(posts.length)));
     }
     var wrap = el("div", "fb-cal");
     var side = el("div", "fb-cal-side");
@@ -308,7 +379,7 @@
       b.onclick = function () { var ds = posts.filter(function (p) { return p.date.indexOf(y) === 0; }).map(function (p) { return p.date; }).sort().reverse()[0]; S.cal = { y: +y, m: ds ? +ds.slice(5, 7) : 12 }; renderCalendar(); };
       side.appendChild(b);
     });
-    if (!yrs.length) side.appendChild(el("div", "fb-cal-empty", "결과 없음"));
+    if (!yrs.length) side.appendChild(el("div", "fb-cal-empty", tr("no_results2")));
     wrap.appendChild(side);
 
     var main = el("div", "fb-cal-main");
@@ -317,14 +388,14 @@
     var yearPosts = posts.filter(function (p) { return p.date.indexOf(String(S.cal.y)) === 0; })
       .sort(function (a, b) { return a.date < b.date ? 1 : -1; });
     if (yearPosts.length && yearPosts.length <= 50) {
-      main.appendChild(el("div", "fb-cal-head2", S.cal.y + "년  ·  " + yearPosts.length + "개"));
+      main.appendChild(el("div", "fb-cal-head2", yearN(S.cal.y) + "  ·  " + countN(yearPosts.length)));
       var ag = el("div", "fb-agenda"), lastDay = "";
       yearPosts.forEach(function (p) {
         var day = p.date.slice(0, 10);
         if (day !== lastDay) { ag.appendChild(el("div", "fb-agenda-date", day)); lastDay = day; }
         var row = el("div", "fb-agenda-row");
-        row.appendChild(el("span", "fb-badge " + p.type, TYPE[p.type] || "글"));
-        row.appendChild(el("span", "fb-agenda-t", p.title || "(무제)"));
+        row.appendChild(el("span", "fb-badge " + p.type, typeLabel(p.type)));
+        row.appendChild(el("span", "fb-agenda-t", p.title || tr("untitled")));
         row.onclick = function () { openPost(p.id); };
         ag.appendChild(row);
       });
@@ -333,10 +404,10 @@
       var head = el("div", "fb-cal-head");
       var prev = el("button", "fb-nav", "‹"); prev.onclick = function () { step(-1); };
       var next = el("button", "fb-nav", "›"); next.onclick = function () { step(1); };
-      head.appendChild(prev); head.appendChild(el("div", "fb-cal-title", S.cal.y + "년 " + S.cal.m + "월")); head.appendChild(next);
+      head.appendChild(prev); head.appendChild(el("div", "fb-cal-title", ymTitle(S.cal.y, S.cal.m))); head.appendChild(next);
       main.appendChild(head);
       var g = el("div", "fb-cal-grid");
-      MON.forEach(function (d) { g.appendChild(el("div", "fb-dow", d)); });
+      tr("mon").split("").forEach(function (d) { g.appendChild(el("div", "fb-dow", d)); });
       var start = new Date(S.cal.y, S.cal.m - 1, 1).getDay();
       var days = new Date(S.cal.y, S.cal.m, 0).getDate();
       for (var i = 0; i < start; i++) g.appendChild(el("div", "fb-cell empty"));
@@ -348,12 +419,12 @@
         if (dayItems.length) { n.onclick = dayClicker(ds, dayItems); }  // expand the day
         cell.appendChild(n);
         dayItems.slice(0, 4).forEach(function (p) {
-          var a = el("div", "fb-ev " + p.type, p.title || "(무제)"); a.title = p.excerpt || p.title || "";
+          var a = el("div", "fb-ev " + p.type, p.title || tr("untitled")); a.title = p.excerpt || p.title || "";
           a.onclick = function () { openPost(p.id); };
           cell.appendChild(a);
         });
         if (dayItems.length > 4) {
-          var more = el("div", "fb-more", "+" + (dayItems.length - 4) + " 더보기");
+          var more = el("div", "fb-more", moreN(dayItems.length - 4));
           more.onclick = dayClicker(ds, dayItems);
           cell.appendChild(more);
         }
@@ -373,7 +444,7 @@
     var card = el("div", "fb-daypop-card");
     var bar = el("div", "fb-daypop-bar");
     els.dayPopTitle = el("div", "fb-daypop-title");
-    var x = el("button", "fb-x", "×"); x.title = "닫기"; x.onclick = closeDayPanel;
+    var x = el("button", "fb-x", "×"); x.title = tr("close"); x.onclick = closeDayPanel;
     bar.appendChild(els.dayPopTitle); bar.appendChild(x);
     els.dayPopList = el("div", "fb-daypop-list");
     card.appendChild(bar); card.appendChild(els.dayPopList);
@@ -384,12 +455,12 @@
   }
   function openDayPanel(ds, items) {
     if (!els.dayPop) buildDayPanel();
-    els.dayPopTitle.textContent = ds + "  ·  " + items.length + "개";
+    els.dayPopTitle.textContent = ds + "  ·  " + countN(items.length);
     els.dayPopList.innerHTML = "";
     items.forEach(function (p) {
       var row = el("div", "fb-agenda-row");
-      row.appendChild(el("span", "fb-badge " + p.type, TYPE[p.type] || "글"));
-      var t = el("span", "fb-agenda-t", p.title || "(무제)");
+      row.appendChild(el("span", "fb-badge " + p.type, typeLabel(p.type)));
+      var t = el("span", "fb-agenda-t", p.title || tr("untitled"));
       row.appendChild(t);
       if (p.thumb) { var im = el("img", "fb-daypop-thumb"); im.loading = "lazy"; im.src = p.thumb; im.onerror = function () { im.remove(); }; row.appendChild(im); }
       row.onclick = function () { closeDayPanel(); openPost(p.id); };
@@ -432,10 +503,10 @@
     var x = el("button", "fb-x", "×"); x.onclick = closePost;
     bar.appendChild(x);
     bar.appendChild(el("div", "fb-date", p ? fmtDate(p.date) : ""));
-    if (p && p.url) { var o = el("a", "fb-orig", "원문 보기 ↗"); o.href = p.url; o.target = "_blank"; o.rel = "noopener"; bar.appendChild(o); }
+    if (p && p.url) { var o = el("a", "fb-orig", tr("view_original")); o.href = p.url; o.target = "_blank"; o.rel = "noopener"; bar.appendChild(o); }
     doc.appendChild(bar);
     var body = el("div", "fb-doc-body");
-    body.innerHTML = '<div class="fb-loading">불러오는 중…</div>';
+    body.innerHTML = '<div class="fb-loading">' + tr("loading") + '</div>';
     doc.appendChild(body);
     els.modal.appendChild(doc);
     els.modal.scrollTop = 0;
@@ -470,8 +541,8 @@
         body.innerHTML = "";
         body.appendChild(el("h1", null, p ? p.title : ""));
         if (p && p.excerpt) body.appendChild(el("p", null, p.excerpt));
-        var note = el("p", "fb-off", "본문을 불러올 수 없습니다.");
-        if (p && p.url) { var a = el("a", "fb-orig", "원문 보기 ↗"); a.href = p.url; a.target = "_blank"; note.appendChild(document.createTextNode(" ")); note.appendChild(a); }
+        var note = el("p", "fb-off", tr("load_body_fail"));
+        if (p && p.url) { var a = el("a", "fb-orig", tr("view_original")); a.href = p.url; a.target = "_blank"; note.appendChild(document.createTextNode(" ")); note.appendChild(a); }
         body.appendChild(note);
         appendRelated(doc, id);
       });
@@ -480,12 +551,12 @@
   function appendRelated(doc, id) {
     var ids = (S.related[id] || []).map(function (rid) { return S.byId[rid]; }).filter(Boolean).slice(0, 8);
     if (!ids.length) return;
-    var rel = el("div", "fb-rel"); rel.appendChild(el("h3", null, "관련 글"));
+    var rel = el("div", "fb-rel"); rel.appendChild(el("h3", null, tr("related")));
     var grid = el("div", "fb-rel-grid");
     ids.forEach(function (rp) {
       var c = el("div", "fb-rel-card"); c.onclick = function () { openPost(rp.id); };
       if (rp.thumb) { var im = el("img", "ri"); im.loading = "lazy"; im.src = rp.thumb; im.onerror = function () { im.remove(); }; c.appendChild(im); }
-      c.appendChild(el("div", "rt", rp.title || "(무제)"));
+      c.appendChild(el("div", "rt", rp.title || tr("untitled")));
       grid.appendChild(c);
     });
     rel.appendChild(grid); doc.appendChild(rel);
@@ -516,13 +587,13 @@
     var wrap = el("div", "fb-prev-wrap"); content.appendChild(wrap);
     urls.slice(0, 4).forEach(function (u) {
       var card = el("a", "fb-prev loading"); card.href = u; card.target = "_blank"; card.rel = "noopener";
-      card.appendChild(el("div", "fb-prev-body", "링크 미리보기…"));
+      card.appendChild(el("div", "fb-prev-body", tr("link_preview")));
       wrap.appendChild(card);
       unfurl(u).then(function (d) {
         card.classList.remove("loading"); card.innerHTML = "";
         if (d && d.ok && d.image) { var im = el("img", "fb-prev-img"); im.loading = "lazy"; im.src = d.image; im.onerror = function () { im.remove(); }; card.appendChild(im); }
         var b = el("div", "fb-prev-body");
-        var site = (d && d.ok && d.site) ? decodeEnt(d.site) : (function () { try { return new URL(u).hostname.replace(/^www\./, ""); } catch (e) { return "원본"; } })();
+        var site = (d && d.ok && d.site) ? decodeEnt(d.site) : (function () { try { return new URL(u).hostname.replace(/^www\./, ""); } catch (e) { return tr("source_fallback"); } })();
         b.appendChild(el("div", "fb-prev-site", site + "  ↗"));
         b.appendChild(el("div", "fb-prev-title", (d && d.ok && decodeEnt(d.title)) || u));
         if (d && d.ok && d.description) b.appendChild(el("div", "fb-prev-desc", decodeEnt(d.description)));
@@ -546,7 +617,7 @@
   function buildLightbox() {
     els.lb = el("div", "fb-lb");
     var top = el("div", "fb-lb-top");
-    var x = el("button", "fb-lb-x", "×"); x.title = "닫기"; x.onclick = closeLightbox;
+    var x = el("button", "fb-lb-x", "×"); x.title = tr("close"); x.onclick = closeLightbox;
     els.lbLink = el("a", "fb-lb-link"); els.lbLink.target = "_blank"; els.lbLink.rel = "noopener";
     top.appendChild(x); top.appendChild(els.lbLink);
     els.lbStage = el("div", "fb-lb-stage");
@@ -554,7 +625,7 @@
     var next = el("button", "fb-lb-nav next", "›"); next.onclick = function (e) { e.stopPropagation(); lbGo(1); };
     els.lbCounter = el("div", "fb-lb-count");
     // position scrubber — jump to any image even across thousands of items
-    els.lbRange = el("input"); els.lbRange.type = "range"; els.lbRange.min = 0; els.lbRange.className = "fb-lb-range"; els.lbRange.title = "위치로 이동";
+    els.lbRange = el("input"); els.lbRange.type = "range"; els.lbRange.min = 0; els.lbRange.className = "fb-lb-range"; els.lbRange.title = tr("lb_goto");
     els.lbRange.addEventListener("input", function () { if (!S.lb) return; S.lb.i = +els.lbRange.value; lbRenderStage(); });
     els.lbRange.addEventListener("change", function () { if (!S.lb) return; S.lb.i = +els.lbRange.value; lbRender(); lbEnsureWindow(); });
     els.lbThumbs = el("div", "fb-lb-thumbs");
@@ -587,7 +658,7 @@
     if (it.type === "video") { var v = el("video"); v.src = it.url; v.controls = true; v.autoplay = true; v.playsInline = true; els.lbStage.appendChild(v); }
     else { var im = el("img"); im.src = it.url; im.alt = it.post_title || ""; els.lbStage.appendChild(im); }
     var href = it.post_url || (it.post_id && S.byId[String(it.post_id)] ? "#post/" + it.post_id : "");
-    if (href) { els.lbLink.href = href; els.lbLink.textContent = (it.post_title ? it.post_title.slice(0, 46) + "  " : "") + "원문 ↗"; els.lbLink.style.display = ""; }
+    if (href) { els.lbLink.href = href; els.lbLink.textContent = (it.post_title ? it.post_title.slice(0, 46) + "  " : "") + tr("original_short"); els.lbLink.style.display = ""; }
     else els.lbLink.style.display = "none";
     els.lbCounter.textContent = (S.lb.i + 1) + " / " + S.lb.items.length;
     if (els.lbRange) { els.lbRange.max = S.lb.items.length - 1; els.lbRange.value = S.lb.i; }
@@ -651,7 +722,7 @@
   }
   /* ── AI chat (multi-turn, archive-grounded RAG; Gemini) ───────────────── */
   var CHAT_KEY = "ffs.chat.v1";
-  function modelLabel(m) { return /flash/i.test(m) ? "빠름 (Flash)" : /pro/i.test(m) ? "정밀 (Pro)" : m; }
+  function modelLabel(m) { return /flash/i.test(m) ? tr("model_fast") : /pro/i.test(m) ? tr("model_precise") : m; }
   function loadChat() { try { S.chat = JSON.parse(sessionStorage.getItem(CHAT_KEY) || "[]") || []; } catch (e) { S.chat = []; } }
   function saveChat() { try { sessionStorage.setItem(CHAT_KEY, JSON.stringify(S.chat.slice(-20))); } catch (e) { /* quota */ } }
 
@@ -661,10 +732,10 @@
     var log = el("div", "fb-chat-log"); els.chatLog = log;
     if (!S.chat.length) {
       var hi = el("div", "fb-chat-hi");
-      hi.appendChild(el("div", "h", "✦ 내 기록과 대화하기"));
-      hi.appendChild(el("div", "p", "내 페이스북 기록을 근거로 답합니다. 사진·영상도 함께 찾아 보여줘요. 무엇이든 물어보세요."));
+      hi.appendChild(el("div", "h", tr("chat_hi")));
+      hi.appendChild(el("div", "p", tr("chat_sub")));
       var ex = el("div", "fb-chat-ex");
-      ["내가 올린 여행 사진들 보여줘", "내가 가장 많이 쓴 주제는?", "2015년에 무슨 일이 있었지?"].forEach(function (q) {
+      [tr("chat_eg1"), tr("chat_eg2"), tr("chat_eg3")].forEach(function (q) {
         var b = el("button", "fb-chat-egg", q); b.onclick = function () { els.chatInput.value = q; sendChat(); };
         ex.appendChild(b);
       });
@@ -675,15 +746,15 @@
     wrap.appendChild(log);
 
     var comp = el("div", "fb-chat-composer");
-    els.chatInput = el("textarea"); els.chatInput.placeholder = "메시지를 입력하세요…  (Enter 전송 · Shift+Enter 줄바꿈)"; els.chatInput.rows = 1;
+    els.chatInput = el("textarea"); els.chatInput.placeholder = tr("chat_ph"); els.chatInput.rows = 1;
     els.chatInput.addEventListener("input", function () { this.style.height = "auto"; this.style.height = Math.min(this.scrollHeight, 160) + "px"; });
     els.chatInput.addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendChat(); } });
-    els.chatSend = el("button", "fb-chat-send"); els.chatSend.innerHTML = "↑"; els.chatSend.title = "전송"; els.chatSend.onclick = sendChat;
+    els.chatSend = el("button", "fb-chat-send"); els.chatSend.innerHTML = "↑"; els.chatSend.title = tr("send"); els.chatSend.onclick = sendChat;
     comp.appendChild(els.chatInput); comp.appendChild(els.chatSend);
     // model selector (Gemini flash ⇄ pro), persisted; sent with each chat turn.
     var models = CFG.models && CFG.models.length ? CFG.models : ["gemini-2.5-flash"];
     if (models.length > 1) {
-      var msel = el("select", "fb-chat-model"); msel.title = "AI 모델";
+      var msel = el("select", "fb-chat-model"); msel.title = tr("ai_model");
       models.forEach(function (m) { msel.appendChild(new Option(modelLabel(m), m)); });
       msel.value = S.model; if (msel.value !== S.model) { S.model = msel.value; }
       msel.onchange = function () { S.model = msel.value; try { localStorage.setItem("ffs.model", S.model); } catch (e) {} };
@@ -691,11 +762,11 @@
     }
     // agent (tool-use) toggle: when on, the AI searches + opens posts via tools
     // for grounded, per-item handling; off = the fast one-shot RAG path.
-    var agt = el("button", "fb-chat-agent" + (S.agent ? " on" : ""), "🔧 도구");
-    agt.title = "도구 사용(에이전트) — 기록을 직접 검색·열람해 더 정확히 답합니다";
+    var agt = el("button", "fb-chat-agent" + (S.agent ? " on" : ""), tr("tools"));
+    agt.title = tr("tools_title");
     agt.onclick = function () { S.agent = !S.agent; try { localStorage.setItem("ffs.agent", S.agent ? "1" : "0"); } catch (e) {} agt.classList.toggle("on", S.agent); };
     comp.appendChild(agt);
-    if (S.chat.length) { var clr = el("button", "fb-chat-clear", "대화 지우기"); clr.onclick = function () { S.chat = []; saveChat(); renderChat(); }; comp.appendChild(clr); }
+    if (S.chat.length) { var clr = el("button", "fb-chat-clear", tr("clear_chat")); clr.onclick = function () { S.chat = []; saveChat(); renderChat(); }; comp.appendChild(clr); }
     wrap.appendChild(comp);
     els.main.appendChild(wrap);
     scrollChat();
@@ -740,7 +811,7 @@
     }
     if (m.role === "bot" && !m._pending && m.sources && m.sources.length) {
       var src = el("div", "fb-chat-src");
-      src.appendChild(el("span", "fb-chat-src-h", "근거 글"));
+      src.appendChild(el("span", "fb-chat-src-h", tr("sources")));
       m.sources.forEach(function (s) { var p = S.byId[String(s.id)]; if (p) { var a = el("a", null, p.title || p.id); a.href = "#post/" + p.id; src.appendChild(a); } });
       b.appendChild(src);
     }
@@ -748,14 +819,14 @@
       var foot = el("div", "fb-chat-foot");
       var meta = [];
       if (m.model) meta.push(m.model);
-      if (m.steps) meta.push("🔧 " + m.steps + "단계");
-      if (m.ms) meta.push((m.ms / 1000).toFixed(1) + "초");
+      if (m.steps) meta.push("🔧 " + m.steps + (EN() ? " steps" : "\ub2e8\uacc4"));
+      if (m.ms) meta.push((m.ms / 1000).toFixed(1) + (EN() ? "s" : "\ucd08"));
       foot.appendChild(el("div", "fb-chat-meta", meta.join("  ·  ")));
       var act = el("div", "fb-chat-act");
-      var copy = el("button", "fb-chat-actbtn", "복사"); copy.title = "답변 복사";
-      copy.onclick = function () { copyText(m.content); copy.textContent = "복사됨"; setTimeout(function () { copy.textContent = "복사"; }, 1200); };
-      var regen = el("button", "fb-chat-actbtn", "다시"); regen.title = "다시 생성"; regen.onclick = function () { regenMessage(m); };
-      var del = el("button", "fb-chat-actbtn del", "삭제"); del.title = "이 질문·답변 삭제"; del.onclick = function () { deleteMessage(m); };
+      var copy = el("button", "fb-chat-actbtn", tr("copy")); copy.title = tr("copy_title");
+      copy.onclick = function () { copyText(m.content); copy.textContent = tr("copied"); setTimeout(function () { copy.textContent = tr("copy"); }, 1200); };
+      var regen = el("button", "fb-chat-actbtn", tr("regen")); regen.title = tr("regen_title"); regen.onclick = function () { regenMessage(m); };
+      var del = el("button", "fb-chat-actbtn del", tr("del")); del.title = tr("del_title"); del.onclick = function () { deleteMessage(m); };
       act.appendChild(copy); act.appendChild(regen); act.appendChild(del);
       foot.appendChild(act);
       b.appendChild(foot);
@@ -809,8 +880,8 @@
     var t0 = Date.now();
     fetch(CFG.chat, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: payload, model: S.model, agent: S.agent }) })
       .then(function (r) { if (!r.ok) throw r.status; return r.json(); })
-      .then(function (res) { pending._pending = false; pending.content = res.answer || "(응답 없음)"; pending.sources = res.sources || []; pending.media = res.media || []; pending.model = res.model || ""; pending.steps = res.steps || 0; pending.ms = Date.now() - t0; })
-      .catch(function (err) { pending._pending = false; pending.content = (err === 429) ? "요청이 많아요. 잠시 후 다시 시도해 주세요." : "지금은 AI를 사용할 수 없어요. 잠시 후 다시 시도해 주세요."; })
+      .then(function (res) { pending._pending = false; pending.content = res.answer || tr("no_response"); pending.sources = res.sources || []; pending.media = res.media || []; pending.model = res.model || ""; pending.steps = res.steps || 0; pending.ms = Date.now() - t0; })
+      .catch(function (err) { pending._pending = false; pending.content = (err === 429) ? tr("err_busy") : tr("err_unavailable"); })
       .then(function () { S.chatBusy = false; if (els.chatSend) els.chatSend.disabled = false; saveChat(); redrawChat(); });
   }
 

@@ -65,6 +65,8 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
 .fb-sp { flex: 1; }
 .fb-year { background: var(--bg3); border: 1px solid var(--line); color: var(--dim); border-radius: 6px; padding: .3rem .6rem; font-size: .82rem; }
 .fb-count { color: var(--faint); font-size: .8rem; }
+.fb-lang { background: var(--bg3); border: 1px solid var(--line); color: var(--dim); border-radius: 6px; padding: .3rem .6rem; font-size: .8rem; cursor: pointer; white-space: nowrap; }
+.fb-lang:hover { color: var(--fg); border-color: var(--accent); }
 
 /* ── Main + grid ──────────────────────────────────────────────────────── */
 .fb-main { max-width: var(--max); margin: 0 auto; padding: 1rem 1.1rem 4rem; }
