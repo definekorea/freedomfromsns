@@ -355,11 +355,13 @@ Reordered around the §0.1 ladder: **ship Tier 0 the fastest, make AI an unlock.
     `ffs autostart on|off` runs the server at login (Win Startup `.vbs`/hidden,
     mac LaunchAgent, Linux XDG). `imageio-ffmpeg` moved to **core** deps so video
     poster thumbnails work on a clean install (no system ffmpeg). — done.
-14. **Tray icon** (control center) — a system-tray app (`pystray` + `Pillow`) that
-    runs the server in the background with a **color-coded status** (running / stopped
-    / published) and a click menu: Open archive · Publish on/off · Auto-start · Quit.
-    The desktop launcher + autostart would run `ffs tray`. Adds 2 deps + needs a
-    display to test; build as `ffs[tray]` or core. (M) 🔜 — the unified "one place".
+14. ✅ **Tray icon** (control center) — `ffs tray`: runs the server as a background
+    process with a **color-coded status icon** (green running / grey stopped / blue
+    published) and a menu — Open · Start/Stop (via loopback `/api/quit`) · Publish
+    on/off · Start at login · Quit. Pillow is core (also fixes image-thumb resizing);
+    `pystray` auto-installs on first `ffs tray`; falls back to `serve --open` if
+    there's no display. Built + non-GUI parts tested; **verify the GUI on Windows**,
+    then wire it as the default desktop launcher + autostart. (M) — done (pending GUI verify).
 
 ---
 

@@ -471,6 +471,20 @@ def register(app: FastAPI, b) -> None:
         set_erased(b, fbids, flag)
         return {"fbids": fbids, "erased": flag, "count": len(fbids)}
 
+    @app.post("/api/quit")
+    async def quit_server(request: Request):
+        """Stop the local server (used by the tray's Start/Stop). Loopback-only."""
+        if not _request_is_local(request):
+            return JSONResponse({"error": "local only"}, status_code=403)
+        import threading
+        import time as _t
+
+        def _bye():
+            _t.sleep(0.3)
+            os._exit(0)
+        threading.Thread(target=_bye, daemon=True).start()
+        return {"stopping": True}
+
     @app.get("/api/embed/status")
     def embed_status():
         """Drives the in-app smart-search progress pill: ready / running(progress) / none."""

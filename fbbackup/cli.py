@@ -8,6 +8,7 @@
     fbbackup serve     run the standalone timeline viewer
     fbbackup share     expose the running dashboard via a Cloudflare quick tunnel
     fbbackup tunnel     permanent public address via a Cloudflare named tunnel
+    fbbackup tray       system-tray control center (status icon + menu)
     fbbackup export-static  index → a self-contained static site (browse + keyword)
     fbbackup publish   deploy a static export to a free host (GitHub/Cloudflare/…)
     fbbackup status     what's present (export? index? rows? embeddings?)
@@ -409,6 +410,40 @@ def cmd_autostart(args) -> int:
     return 0
 
 
+def cmd_tray(args) -> int:
+    """Run the system-tray control center (background server + colored status icon +
+    menu). Installs pystray on demand; falls back to a normal serve if there's no
+    tray/display (e.g. headless)."""
+    from fbbackup import setup as wiz
+    home = _home()
+    os.environ["FBBACKUP_HOME"] = str(home)
+    p = _paths(args)
+    cfg_serve = p["cfg"].get("serve", {})
+    host = args.host or cfg_serve.get("host", "127.0.0.1")
+    port = int(args.port or cfg_serve.get("port", 8282))
+
+    def _have_tray() -> bool:
+        try:
+            import PIL  # noqa: F401
+            import pystray  # noqa: F401
+            return True
+        except Exception:  # noqa: BLE001
+            return False
+
+    if not _have_tray():
+        print("Setting up the tray (one-time)…", flush=True)
+        wiz.ensure_pkgs(["pystray"])     # Pillow is a core dep already
+    if _have_tray():
+        try:
+            from fbbackup import tray
+            return tray.run(host, port, home)
+        except Exception as e:  # noqa: BLE001  (no display / backend) → fall back
+            print(f"Tray unavailable ({str(e)[:80]}) — starting normally.", flush=True)
+    args.open = True
+    args.reload = False
+    return cmd_serve(args)
+
+
 def cmd_shortcut(args) -> int:
     """Create (or refresh) a desktop launcher that reopens the archive in one click."""
     from fbbackup import setup as wiz
@@ -686,6 +721,10 @@ def _build_parser() -> argparse.ArgumentParser:
     sv.add_argument("--reload", action="store_true",
                     help="auto-reload the server on Python edits (dev)")
 
+    tr = sub.add_parser("tray", help="system-tray control center (status icon + menu)")
+    tr.add_argument("--host"); tr.add_argument("--port")
+    common(tr, index=True)
+
     sc = sub.add_parser("shortcut", help="create a desktop launcher (one-click relaunch)")
     common(sc, index=True)
 
@@ -729,7 +768,8 @@ _DISPATCH = {
     "setup": cmd_setup,
     "parse": cmd_parse, "build": cmd_build, "embed": cmd_embed, "index": cmd_index,
     "serve": cmd_serve, "share": cmd_share, "tunnel": cmd_tunnel, "shortcut": cmd_shortcut,
-    "autostart": cmd_autostart, "uninstall": cmd_uninstall, "status": cmd_status, "doctor": cmd_doctor,
+    "tray": cmd_tray, "autostart": cmd_autostart, "uninstall": cmd_uninstall,
+    "status": cmd_status, "doctor": cmd_doctor,
     "export-static": cmd_export_static, "publish": cmd_publish,
 }
 

@@ -536,6 +536,25 @@ def ensure_local_deps(gpu: bool) -> bool:
     return False
 
 
+def ensure_pkgs(pkgs: list[str]) -> bool:
+    """Install pip packages into THIS interpreter via uv (preferred) or pip — used to
+    fetch optional pieces (e.g. pystray for the tray) on demand. Best-effort."""
+    import subprocess
+    if not pkgs:
+        return True
+    attempts = []
+    if shutil.which("uv"):
+        attempts.append(["uv", "pip", "install", "--python", sys.executable, *pkgs])
+    attempts.append([sys.executable, "-m", "pip", "install", *pkgs])
+    for cmd in attempts:
+        try:
+            if subprocess.run(cmd, timeout=600).returncode == 0:
+                return True
+        except Exception:  # noqa: BLE001
+            continue
+    return False
+
+
 def spawn_background_embed(home: Path, provider: str, device: str = "", model: str = "") -> None:
     """Kick off `ffs embed` as a detached background process (logs to embed.log) so
     the semantic index builds while the user browses. Resumable + safe to re-run."""

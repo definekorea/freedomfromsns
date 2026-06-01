@@ -1,6 +1,6 @@
 [project]
 name = "freedomfromsns"
-version = "0.1.8"
+version = "0.1.9"
 description = "FreedomFromSNS — browse, search, and chat with your Facebook archive, locally. Gemini-powered."
 requires-python = ">=3.11"
 dependencies = [
@@ -11,6 +11,7 @@ dependencies = [
     "imageio-ffmpeg>=0.5",  # bundled static ffmpeg → video poster-frame thumbnails work
                             # everywhere (no system ffmpeg); spaces_backend prefers a
                             # system ffmpeg and falls back to this.
+    "pillow>=10",           # image thumbnail resizing (lighter/faster grid) + tray icon
 ]
 
 [project.optional-dependencies]
