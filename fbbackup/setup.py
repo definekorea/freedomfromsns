@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 import zipfile
 from pathlib import Path
 
@@ -32,6 +33,9 @@ STRINGS: dict[str, dict[str, str]] = {
                       "(no */your_facebook_activity/posts inside).",
         "unzipping": "Unzipping {path} …",
         "using":     "Using export: {path}",
+        "data_place": "Use it where it is, or move it into ~/ffs/data? "
+                      "[1] keep it here (default)  [2] move it in: ",
+        "moving":    "Moving your export into ~/ffs/data …",
         "parsing":   "Reading your posts…",
         "building":  "Building your timeline…",
         "parsed":    "Read {n} posts.",
@@ -60,6 +64,9 @@ STRINGS: dict[str, dict[str, str]] = {
                       "(*/your_facebook_activity/posts 없음).",
         "unzipping": "{path} 압축을 푸는 중…",
         "using":     "사용할 내보내기: {path}",
+        "data_place": "현재 위치에서 그대로 쓸까요, ~/ffs/data로 옮길까요? "
+                      "[1] 그대로 두기(기본)  [2] 옮기기: ",
+        "moving":    "내보내기를 ~/ffs/data로 옮기는 중…",
         "parsing":   "게시물을 읽는 중…",
         "building":  "타임라인을 만드는 중…",
         "parsed":    "게시물 {n}개를 읽었습니다.",
@@ -163,6 +170,46 @@ def locate_export(extra_roots: list[Path] | None = None) -> list[dict]:
             out.append({"kind": "zip", "root": z, "mtime": z.stat().st_mtime})
     out.sort(key=lambda c: c["mtime"], reverse=True)
     return out
+
+
+def resolve_export_dir(path: Path) -> Path | None:
+    """Given a folder the user pointed at (a zip is handled separately), return the
+    dir to set as [export].root — the parent that holds a ``facebook-…/your_facebook_
+    activity/posts``. Accepts either the ``facebook-…`` folder itself or its parent.
+    Returns None if it isn't a Facebook export."""
+    path = Path(path)
+    if not path.is_dir():
+        return None
+    if _has_export(path):                                       # pointed AT the facebook-… folder
+        return path.parent.resolve()
+    try:
+        if any(c.is_dir() and _has_export(c) for c in path.iterdir()):  # pointed at the parent
+            return path.resolve()
+    except OSError:
+        pass
+    return None
+
+
+def is_within(child: Path, parent: Path) -> bool:
+    try:
+        Path(child).resolve().relative_to(Path(parent).resolve())
+        return True
+    except (ValueError, OSError):
+        return False
+
+
+def relocate_export(export_root: Path, home: Path) -> Path:
+    """Move the ``facebook-…`` folder(s) under ``export_root`` into ``~/ffs/data`` so
+    the whole archive lives in one place, and return ``~/ffs/data`` (the new root).
+    Only the export folders move — unrelated siblings are left alone."""
+    dest = home / "data"
+    dest.mkdir(parents=True, exist_ok=True)
+    for child in list(Path(export_root).iterdir()):
+        if child.is_dir() and _has_export(child):
+            target = dest / child.name
+            if target.resolve() != child.resolve():
+                shutil.move(str(child), str(target))
+    return dest.resolve()
 
 
 def unzip_export(zip_path: Path, dest_parent: Path) -> Path:

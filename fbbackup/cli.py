@@ -22,6 +22,7 @@ import json
 import os
 import subprocess
 import sys
+import zipfile
 from pathlib import Path
 
 
@@ -180,9 +181,11 @@ def cmd_setup(args) -> int:
 
     say("welcome")
 
-    # 1. Find the data — ask nothing if exactly one export is found.
+    # 1. Find the data. Resolve a SOURCE (a .zip or a folder the user pointed at),
+    #    from --export or auto-locate, then turn it into the export root.
+    src = None  # Path to a .zip or a folder
     if args.export:
-        chosen_root = _abs(args.export)
+        src = _abs(args.export)
     else:
         say("searching")
         cands = wiz.locate_export()
@@ -203,24 +206,42 @@ def cmd_setup(args) -> int:
             chosen = cands[idx]
         if chosen is None:
             say("none_found")
-            try:
-                manual = input(wiz.t(lang, "enter_path")).strip()
+            try:                                       # browse to a .zip OR a folder
+                manual = input(wiz.t(lang, "enter_path")).strip().strip('"').strip("'")
             except EOFError:
                 manual = ""
             if not manual:
                 return 2
-            chosen = {"kind": "folder", "root": _abs(manual)}
-        if chosen["kind"] == "zip":
-            say("unzipping", path=chosen["root"])
-            chosen_root = wiz.unzip_export(Path(chosen["root"]), home)
+            src = _abs(manual)
         else:
-            chosen_root = Path(chosen["root"])
+            src = Path(chosen["root"])                 # zip path, or the located parent folder
+
+    # turn the source into the export root, handling zip / in-place / move-in
+    if str(src).lower().endswith(".zip") or (src.is_file() and zipfile.is_zipfile(str(src))):
+        say("unzipping", path=src)                     # extract into ~/ffs/data
+        chosen_root = wiz.unzip_export(src, home)
+    else:
+        root = wiz.resolve_export_dir(src)
+        if root is None:
+            say("not_export")
+            return 2
+        chosen_root = root
+        # already-extracted folder elsewhere → keep in place (default), or move into ~/ffs/data
+        if not args.yes and not wiz.is_within(root, home):
+            try:
+                ans = input(wiz.t(lang, "data_place")).strip().lower()
+            except EOFError:
+                ans = ""
+            if ans in ("2", "m", "move", "옮기기", "이동"):
+                say("moving")
+                chosen_root = wiz.relocate_export(root, home)
 
     wiz.set_export_root(home, chosen_root)
+    args.export = str(chosen_root)   # the RESOLVED root wins in _paths (over the raw --export/zip/moved path)
     say("using", path=chosen_root)
 
     # 2. Process to Tier 0 — parse + build (fast, deterministic; no embedding).
-    p = _paths(args)  # re-reads config.toml → now points at the chosen export
+    p = _paths(args)  # uses the resolved export root
     if not p["export"].is_dir():
         say("not_export")
         return 2
