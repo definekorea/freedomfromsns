@@ -87,6 +87,14 @@ STRINGS: dict[str, dict[str, str]] = {
         "lang_prompt": "Language / 언어 — [1] English  [2] 한국어 (default {d}): ",
         "no_posts":  "No posts found in that export. Make sure you downloaded "
                      "*Posts* in *JSON* format from Facebook, then unzipped it.",
+        "no_data_guide": "No Facebook export found yet — that's fine, the app is installed.\n"
+                         "  1) Request your data: Accounts Center → Your information and\n"
+                         "     permissions → Export your information → Format JSON, All time.\n"
+                         "     (Meta emails you when it's ready — often 1–3 days.)\n"
+                         "  2) When the .zip is in your Downloads, double-click the\n"
+                         "     \"FreedomFromSNS (Add data)\" icon on your Desktop — or just run\n"
+                         "     `ffs setup` again. It'll find the file automatically.",
+        "add_data_made": "Added a \"FreedomFromSNS (Add data)\" launcher: {path}",
         "choose":    "Pick a number (default 1): ",
     },
     "ko": {
@@ -154,6 +162,13 @@ STRINGS: dict[str, dict[str, str]] = {
         "lang_prompt": "Language / 언어 — [1] English  [2] 한국어 (기본 {d}): ",
         "no_posts":  "그 내보내기에서 게시물을 찾지 못했습니다. 페이스북에서 "
                      "*게시물*을 *JSON* 형식으로 받아 압축을 풀었는지 확인하세요.",
+        "no_data_guide": "아직 페이스북 데이터를 찾지 못했어요 — 괜찮아요, 앱은 설치됐습니다.\n"
+                         "  1) 데이터 신청: 어카운트 센터 → 내 정보 및 권한 → 정보 내보내기\n"
+                         "     → 형식 JSON, 전체 기간. (준비되면 이메일이 옵니다 — 보통 1~3일.)\n"
+                         "  2) 받은 .zip이 다운로드 폴더에 있으면, 바탕화면의\n"
+                         "     \"FreedomFromSNS (Add data)\" 아이콘을 더블클릭하세요 — 또는\n"
+                         "     `ffs setup`을 다시 실행하면 파일을 자동으로 찾습니다.",
+        "add_data_made": "\"FreedomFromSNS (Add data)\" 바로가기를 만들었어요: {path}",
         "choose":    "번호를 고르세요 (기본 1): ",
     },
 }
@@ -196,8 +211,10 @@ def search_roots() -> list[Path]:
     or two in each (no full-disk walk)."""
     home = Path.home()
     roots = [home / "Downloads", home / "Desktop", home / "Documents", home, Path.cwd()]
-    if os.name == "nt":  # also scan other drive roots (D:, E:, …)
-        import string
+    if os.name == "nt":
+        od = home / "OneDrive"   # Desktop/Documents/Downloads are often redirected into OneDrive
+        roots += [od / "Downloads", od / "Desktop", od / "Documents"]
+        import string             # also scan other drive roots (D:, E:, …)
         roots += [Path(f"{d}:/") for d in string.ascii_uppercase if Path(f"{d}:/").exists()]
     return roots
 
@@ -235,7 +252,9 @@ def locate_export(extra_roots: list[Path] | None = None) -> list[dict]:
             if not z.is_file() or z.suffix.lower() != ".zip":
                 continue
             n = z.name.lower()
-            if not (n.startswith("facebook-") or ("your" in n and "information" in n)):
+            # Facebook names exports `facebook-<name>-<date>-<hash>.zip`; also accept
+            # any zip containing "facebook" or a "your…information" download.
+            if not ("facebook" in n or ("your" in n and "information" in n)):
                 continue
             zr = z.resolve()
             if zr in seen:
@@ -541,23 +560,24 @@ def _desktop_dir() -> Path | None:
     return None
 
 
-def create_launcher(home: Path) -> Path | None:
+def create_launcher(home: Path, name: str = "FreedomFromSNS", cli: str = "serve --open") -> Path | None:
     """Write a double-clickable launcher (Desktop if available, else the home dir)
-    that starts the local server and opens the browser — one-click relaunch. Returns
-    the path written. Bakes FBBACKUP_HOME so it always finds this archive."""
+    that runs `ffs <cli>` with FBBACKUP_HOME baked in. Default = one-click relaunch
+    (serve + open browser); pass cli='setup' for an "add my data later" launcher."""
     py = sys.executable
     where = _desktop_dir() or home
     try:
         if os.name == "nt":
-            f = where / "FreedomFromSNS.cmd"
+            f = where / f"{name}.cmd"
             f.write_text("@echo off\r\n"
                          f'set "FBBACKUP_HOME={home}"\r\n'
-                         f'"{py}" -m fbbackup.cli serve --open\r\n', encoding="utf-8")
+                         f'"{py}" -m fbbackup.cli {cli}\r\n'
+                         "if errorlevel 1 pause\r\n", encoding="utf-8")
         else:
             ext = "command" if sys.platform == "darwin" else "sh"
-            f = where / f"FreedomFromSNS.{ext}"
+            f = where / f"{name}.{ext}"
             f.write_text(f'#!/bin/sh\nexport FBBACKUP_HOME="{home}"\n'
-                         f'exec "{py}" -m fbbackup.cli serve --open\n', encoding="utf-8")
+                         f'exec "{py}" -m fbbackup.cli {cli}\n', encoding="utf-8")
             f.chmod(0o755)
         return f
     except Exception:  # noqa: BLE001

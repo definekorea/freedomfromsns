@@ -16,7 +16,17 @@ set -eu
 # > the latest GitHub Release wheel (no PyPI, no git, no clone — uv installs the
 # wheel straight from its HTTPS URL).
 REPO="${FFS_REPO:-definekorea/freedomfromsns}"
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd 2>/dev/null) || SCRIPT_DIR=""
+# Let the wizard search in/near the installer; and if this file lives in a DEDICATED
+# folder (not a transient one like Downloads/Desktop/Documents/home/tmp), make that
+# folder the archive home. Transient ones fall through to the default (~/ffs).
+if [ -n "$SCRIPT_DIR" ] && [ -f "$SCRIPT_DIR/install-ffs.sh" ]; then
+  export FFS_LOOK="$SCRIPT_DIR"
+  case "$SCRIPT_DIR" in
+    "$HOME"|"$HOME/Downloads"|"$HOME/Desktop"|"$HOME/Documents"|/tmp|/tmp/*) : ;;
+    *) [ -z "${FBBACKUP_HOME:-}" ] && [ ! -f "$SCRIPT_DIR/pyproject.toml" ] && export FBBACKUP_HOME="$SCRIPT_DIR" ;;
+  esac
+fi
 if [ -n "${FFS_SOURCE:-}" ]; then
   SOURCE="$FFS_SOURCE"
 elif [ -f "$SCRIPT_DIR/pyproject.toml" ]; then

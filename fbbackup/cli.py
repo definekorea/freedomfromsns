@@ -194,7 +194,12 @@ def cmd_setup(args) -> int:
         src = _abs(args.export)
     else:
         say("searching")
-        cands = wiz.locate_export(extra_roots=[home, home / "data"])   # always check the FFS home + its data/
+        extra = [home, home / "data"]
+        look = os.environ.get("FFS_LOOK")        # the installer passes its own folder
+        if look:
+            lp = Path(look)
+            extra += [lp, lp / "data", lp.parent]   # in, under, and near the installer
+        cands = wiz.locate_export(extra_roots=extra)
         chosen = None
         if len(cands) == 1 or (cands and args.yes):
             chosen = cands[0]
@@ -216,8 +221,12 @@ def cmd_setup(args) -> int:
                 manual = input(wiz.t(lang, "enter_path")).strip().strip('"').strip("'")
             except EOFError:
                 manual = ""
-            if not manual:
-                return 2
+            if not manual:                              # no data yet → finish install + guide
+                say("no_data_guide")
+                sc = wiz.create_launcher(home, "FreedomFromSNS (Add data)", "setup")
+                if sc:
+                    say("add_data_made", path=sc)
+                return 0
             src = _abs(manual)
         else:
             src = Path(chosen["root"])                 # zip path, or the located parent folder
