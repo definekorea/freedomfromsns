@@ -343,6 +343,14 @@ def cmd_setup(args) -> int:
             say("embed_started_est", min=test.get("est_min", 0))
         elif test.get("deps"):
             say("backoff_slow", min=test.get("est_min", 0))   # too slow / OOM-risk → steer to a key
+        # Local path → also wire no-key local CHAT (EXAONE), downloaded in the
+        # background so Tier 2 works offline too. Chosen because it's the strongest
+        # small model on Korean (see docs/local-models.md); the chat route serves it.
+        from fbbackup import providers
+        providers.save_settings({"chat": {"provider": "local", "fast_model": "local",
+                                          "precise_model": "local"}})
+        say("localchat_setup")
+        wiz.spawn_background_localchat(home)
     elif choice == "gemini":
         from .embed import gemini_key
         from . import providers

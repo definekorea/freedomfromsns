@@ -64,6 +64,8 @@ STRINGS: dict[str, dict[str, str]] = {
                         "Browsing + keyword search work now; for fast meaning-based search, "
                         "connect a free AI key in the app (skipped the local model for now).",
         "embed_skip": "Skipped. You can enable smart search & chat anytime in the app.",
+        "localchat_setup": "Setting up no-key local AI chat (EXAONE) in the background "
+                           "(~1.5 GB, one time) — it'll be ready shortly; browse meanwhile.",
         "tn_downloading_cf": "Downloading cloudflared (one time, ~35 MB)…",
         "tn_need_cf": "Couldn't get cloudflared automatically. Install it:",
         "tn_intro":  "A permanent address lives on your own domain (e.g. archive.yourname.com) and "
@@ -142,6 +144,8 @@ STRINGS: dict[str, dict[str, str]] = {
                         "둘러보기·키워드 검색은 지금 바로 되고, 빠른 의미 검색을 원하면 "
                         "앱에서 무료 AI 키를 연결하세요(로컬 모델은 일단 건너뜀).",
         "embed_skip": "건너뛰었습니다. 스마트 검색·AI 대화는 언제든 앱에서 켤 수 있어요.",
+        "localchat_setup": "백그라운드에서 무료 로컬 AI 대화(EXAONE)를 준비하는 중입니다"
+                           "(최초 1회 약 1.5 GB) — 곧 준비됩니다. 그 사이 둘러보세요.",
         "tn_downloading_cf": "cloudflared를 내려받는 중입니다(최초 1회, 약 35 MB)…",
         "tn_need_cf": "cloudflared를 자동으로 받지 못했습니다. 직접 설치:",
         "tn_intro":  "고정 주소는 내 도메인(예: archive.yourname.com)으로 제공되며 재시작해도 "
@@ -592,6 +596,23 @@ def spawn_background_embed(home: Path, provider: str, device: str = "", model: s
     else:
         kw["start_new_session"] = True
     subprocess.Popen([sys.executable, "-m", "fbbackup.cli", "embed"],
+                     stdout=log, stderr=log, stdin=subprocess.DEVNULL, env=env, **kw)
+
+
+def spawn_background_localchat(home: Path, model: str = "exaone") -> None:
+    """Kick off `ffs localchat` detached (logs to localchat.log) so the no-key local
+    chat model downloads + starts while the user browses — ready by the time they
+    open chat. EXAONE by default (best Korean of the small models)."""
+    import subprocess
+    env = dict(os.environ)
+    env["FBBACKUP_HOME"] = str(home)
+    log = open(home / "localchat.log", "ab")
+    kw: dict = {}
+    if os.name == "nt":
+        kw["creationflags"] = 0x00000008 | 0x00000200   # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+    else:
+        kw["start_new_session"] = True
+    subprocess.Popen([sys.executable, "-m", "fbbackup.cli", "localchat", "--model", model],
                      stdout=log, stderr=log, stdin=subprocess.DEVNULL, env=env, **kw)
 
 
