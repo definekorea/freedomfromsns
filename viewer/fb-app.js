@@ -23,6 +23,7 @@
     semanticLoading: false, searchToken: 0,
     model: (function () { try { return localStorage.getItem("ffs.model") || (CFG.defaultModel || "gemini-2.5-flash"); } catch (e) { return CFG.defaultModel || "gemini-2.5-flash"; } })(),
     agent: (function () { try { var v = localStorage.getItem("ffs.agent"); return v === null ? true : v === "1"; } catch (e) { return true; } })(),
+    hideEmpty: (function () { try { var v = localStorage.getItem("ffs.hideEmpty"); return v === null ? true : v === "1"; } catch (e) { return true; } })(),
   };
   var els = {};
 
@@ -93,6 +94,12 @@
     yrs.forEach(function (y) { sel.appendChild(new Option(y + "년", y)); });
     sel.value = S.year; sel.onchange = function () { S.year = sel.value; S.shown = PAGE; renderBrowse(); };
     els.filters.appendChild(sel);
+    // hide "meaningless" posts (empty / reshares missing the original with no link) — on by default
+    var tg = el("label", "fb-hide-empty" + (S.hideEmpty ? " on" : ""));
+    var cb = el("input"); cb.type = "checkbox"; cb.checked = S.hideEmpty;
+    cb.onchange = function () { S.hideEmpty = cb.checked; try { localStorage.setItem("ffs.hideEmpty", cb.checked ? "1" : "0"); } catch (e) {} S.shown = PAGE; tg.classList.toggle("on", cb.checked); renderCurrentView(); };
+    tg.appendChild(cb); tg.appendChild(el("span", null, "빈 글·원본 없는 공유 숨기기"));
+    els.filters.appendChild(tg);
     els.count = el("div", "fb-count"); els.filters.appendChild(els.count);
   }
 
@@ -177,19 +184,21 @@
   }
 
   /* ── browse grid (filter + paginate, instant) ───────────────────────── */
+  function baseList() {
+    if (S.semanticIds) return S.semanticIds.map(function (id) { return S.byId[id]; }).filter(Boolean);
+    var q = S.q.toLowerCase();
+    return S.posts.filter(function (p) { return !q || (p.title + " " + (p.excerpt || "")).toLowerCase().indexOf(q) >= 0; });
+  }
+  // 전체 = the post timeline only; loose media (미분류) is its own bucket.
+  function passType(p) { return S.type === "all" ? p.type !== "uncat" : p.type === S.type; }
+  function passYear(p) { return S.year === "all" || p.date.slice(0, 4) === S.year; }
+  // the view's full set (ignores the hide toggle) — the denominator for the count.
+  function scoped() { return baseList().filter(function (p) { return passType(p) && passYear(p); }); }
   function filtered() {
-    var base;
-    if (S.semanticIds) { base = S.semanticIds.map(function (id) { return S.byId[id]; }).filter(Boolean); }
-    else {
-      var q = S.q.toLowerCase();
-      base = S.posts.filter(function (p) { return !q || (p.title + " " + (p.excerpt || "")).toLowerCase().indexOf(q) >= 0; });
-    }
-    return base.filter(function (p) {
-      // 전체 = the post timeline only; loose media (미분류) is its own bucket.
-      if (S.type === "all") { if (p.type === "uncat") return false; }
-      else if (p.type !== S.type) return false;
-      if (S.year !== "all" && p.date.slice(0, 4) !== S.year) return false;
-      return true;
+    return scoped().filter(function (p) {
+      // hide meaningless posts (empty / reshares missing the original, no link) —
+      // never hides 미분류 images (they're never flagged meaningless).
+      return !(S.hideEmpty && p.meaningless);
     });
   }
 
@@ -215,7 +224,12 @@
     renderFilters();
     els.main.innerHTML = "";
     var list = filtered();
-    if (els.count) els.count.textContent = list.length.toLocaleString() + "개" + (S.semanticLoading ? "  ·  관련 글 찾는 중…" : (S.semanticIds && S.q ? "  ·  의미 검색" : ""));
+    if (els.count) {
+      // displayed / total — total is the view's full set (before the hide toggle).
+      var total = scoped().length;
+      var note = S.semanticLoading ? "  ·  관련 글 찾는 중…" : (S.semanticIds && S.q ? "  ·  의미 검색" : "");
+      els.count.textContent = list.length.toLocaleString() + " / " + total.toLocaleString() + note;
+    }
     if (!list.length) {
       els.main.appendChild(el("div", "fb-empty", S.semanticLoading ? "검색 중…" : "결과가 없습니다."));
       return;
@@ -507,7 +521,6 @@
     var sx = null;
     els.lbStage.addEventListener("touchstart", function (e) { sx = e.touches[0].clientX; }, { passive: true });
     els.lbStage.addEventListener("touchend", function (e) { if (sx == null) return; var dx = e.changedTouches[0].clientX - sx; if (Math.abs(dx) > 40) lbGo(dx < 0 ? 1 : -1); sx = null; });
-    enableGrabScroll(els.lbThumbs);
     document.body.appendChild(els.lb);
   }
   function openLightbox(items, i) {
@@ -519,7 +532,7 @@
     lbRender(); renderLbThumbs();
   }
   function closeLightbox() { if (els.lb) { els.lb.classList.remove("on"); els.lbStage.innerHTML = ""; } document.body.style.overflow = ""; S.lb = null; }
-  function lbGo(d) { if (!S.lb) return; var n = S.lb.items.length; S.lb.i = (S.lb.i + d + n) % n; lbRender(); lbAfterNav(); }
+  function lbGo(d) { if (!S.lb) return; var n = S.lb.items.length; S.lb.i = (S.lb.i + d + n) % n; lbRender(); lbEnsureWindow(); }
   function lbRender() {
     var it = S.lb.items[S.lb.i];
     els.lbStage.innerHTML = "";
@@ -531,33 +544,46 @@
     els.lbCounter.textContent = (S.lb.i + 1) + " / " + S.lb.items.length;
     lbHighlight();
   }
-  // The strip can hold thousands of items (the whole 미분류 set), so render only a
-  // WINDOW of thumbnails around the current image; slide it as you navigate.
-  var LB_WIN = 40;
-  function renderLbThumbs() {
+  // The strip can hold thousands of items (the whole 미분류 set), so keep only a
+  // window of thumbnails in the DOM — but EXTEND it by appending/prepending (never
+  // clearing) so navigation is smooth with no flashing rebuild, and always keep a
+  // generous buffer (LB_MARGIN) ahead so thumbs load well before you reach the end.
+  var LB_WIN = 30, LB_MARGIN = 15, LB_MAX = 240;
+  function lbThumb(k) {
+    var it = S.lb.items[k];
+    var t = el("div", "fb-lb-thumb" + (it.type === "video" ? " vid" : ""));
+    t.dataset.idx = k;
+    var im = el("img"); im.loading = "lazy"; im.src = it.thumb || it.url;
+    im.onerror = (function (tt) { return function () { tt.classList.add("err"); }; })(t);
+    t.appendChild(im);
+    t.onclick = (function (idx) { return function () { S.lb.i = idx; lbRender(); lbEnsureWindow(); }; })(k);
+    return t;
+  }
+  function renderLbThumbs() {  // full (re)build centered on the current image
     els.lbThumbs.innerHTML = "";
     if (!S.lb) return;
     var n = S.lb.items.length, i = S.lb.i;
-    var start = Math.max(0, i - LB_WIN), end = Math.min(n, i + LB_WIN + 1);
-    S.lb.winStart = start; S.lb.winEnd = end;
-    for (var k = start; k < end; k++) {
-      var it = S.lb.items[k];
-      var t = el("div", "fb-lb-thumb" + (it.type === "video" ? " vid" : "") + (k === i ? " on" : ""));
-      t.dataset.idx = k;
-      var im = el("img"); im.loading = "lazy"; im.src = it.thumb || it.url;
-      im.onerror = (function (tt) { return function () { tt.classList.add("err"); }; })(t);
-      t.appendChild(im);
-      t.onclick = (function (idx) { return function () { S.lb.i = idx; lbRender(); lbAfterNav(); }; })(k);
-      els.lbThumbs.appendChild(t);
-    }
-    lbCenterThumb();
+    S.lb.winStart = Math.max(0, i - LB_WIN);
+    S.lb.winEnd = Math.min(n, i + LB_WIN + 1);
+    for (var k = S.lb.winStart; k < S.lb.winEnd; k++) els.lbThumbs.appendChild(lbThumb(k));
+    lbHighlight(); lbCenterThumb();
   }
   function lbHighlight() { var kids = els.lbThumbs.children; for (var k = 0; k < kids.length; k++) kids[k].classList.toggle("on", +kids[k].dataset.idx === S.lb.i); }
-  function lbAfterNav() {
+  function lbEnsureWindow() {
     if (!S.lb) return;
-    // re-window near an edge (or after a thumb jump out of range); else just recenter
-    if (S.lb.i < S.lb.winStart + 5 || S.lb.i >= S.lb.winEnd - 5) renderLbThumbs();
-    else { lbHighlight(); lbCenterThumb(); }
+    var n = S.lb.items.length, i = S.lb.i;
+    // jumped outside the window (e.g. wrap-around) or it grew too big → rebuild once
+    if (i < S.lb.winStart || i >= S.lb.winEnd || (S.lb.winEnd - S.lb.winStart) > LB_MAX) { renderLbThumbs(); return; }
+    while (S.lb.winEnd < n && i >= S.lb.winEnd - LB_MARGIN) {       // append forward
+      els.lbThumbs.appendChild(lbThumb(S.lb.winEnd)); S.lb.winEnd++;
+    }
+    while (S.lb.winStart > 0 && i < S.lb.winStart + LB_MARGIN) {    // prepend backward
+      S.lb.winStart--;
+      var before = els.lbThumbs.scrollWidth;
+      els.lbThumbs.insertBefore(lbThumb(S.lb.winStart), els.lbThumbs.firstChild);
+      els.lbThumbs.scrollLeft += els.lbThumbs.scrollWidth - before;  // keep visual position
+    }
+    lbHighlight(); lbCenterThumb();
   }
   function lbCenterThumb() { var kids = els.lbThumbs.children; for (var k = 0; k < kids.length; k++) if (+kids[k].dataset.idx === S.lb.i) { kids[k].scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" }); return; } }
   // Clicking an uncategorized image opens the whole 미분류 set in the lightbox so
@@ -574,14 +600,6 @@
     }
     openLightbox(items, startIdx);
   }
-  function enableGrabScroll(elm) {
-    var down = false, startX, startL;
-    elm.addEventListener("mousedown", function (e) { down = true; startX = e.pageX; startL = elm.scrollLeft; elm.classList.add("grabbing"); });
-    window.addEventListener("mouseup", function () { down = false; if (elm.classList) elm.classList.remove("grabbing"); });
-    elm.addEventListener("mouseleave", function () { down = false; elm.classList.remove("grabbing"); });
-    elm.addEventListener("mousemove", function (e) { if (!down) return; e.preventDefault(); elm.scrollLeft = startL - (e.pageX - startX); });
-  }
-
   /* ── AI chat (multi-turn, archive-grounded RAG; Gemini) ───────────────── */
   var CHAT_KEY = "ffs.chat.v1";
   function modelLabel(m) { return /flash/i.test(m) ? "빠름 (Flash)" : /pro/i.test(m) ? "정밀 (Pro)" : m; }

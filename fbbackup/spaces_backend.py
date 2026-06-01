@@ -266,7 +266,10 @@ class SpacesBackend:
                     text_lines = [s for line in body.splitlines()
                                   if (s := line.strip()) and not s.startswith(("#", "![", "🔗", "[▶", "📍", "📘"))]
                     text_content = " ".join(" ".join(text_lines).split())
-                    has_visual = ("![" in body) or ("🔗" in body) or ("[▶" in body)
+                    # 📘 = a Facebook permalink to the original (a reshare you CAN
+                    # still open), so it counts as "not empty" — only reshares that
+                    # are missing the original AND can't link to it are meaningless.
+                    has_visual = ("![" in body) or ("🔗" in body) or ("[▶" in body) or ("📘" in body)
                     trivial = (not text_content) or (text_content == " ".join(title.split()))
                     empty = trivial and not has_visual
                     row = {

@@ -214,7 +214,10 @@ def register(app: FastAPI, b) -> None:
                 thumb = f"/api/fb/files?path={quote(str(img))}&w=400"
             out.append({"id": r["id"], "date": date, "title": r["title"],
                         "type": str(p.get("type") or "status"),
-                        "excerpt": r["summary"], "thumb": thumb, "url": ""})
+                        "excerpt": r["summary"], "thumb": thumb, "url": "",
+                        # "meaningless": no media, no link, no original to open, and
+                        # no real text (empty or title==text) — hidden by default.
+                        "meaningless": bool(r.get("empty"))})
         out.sort(key=lambda r: r["date"], reverse=True)  # newest first
         return JSONResponse(out)
 
