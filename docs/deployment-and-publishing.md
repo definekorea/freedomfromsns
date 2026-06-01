@@ -70,6 +70,11 @@ gracefully, or has a pip-installable substitute.**
 **Net:** a default install needs only pure-Python wheels. ffmpeg → pip substitute.
 Local embeddings + GPU → opt-in. cloudflared → a single binary, only when publishing.
 
+> **Strengthening the offline tier** (research): better small local embedding models
+> (Nomic v1.5 / EmbeddingGemma / BGE-M3) and a **no-key local chat** option via tiny
+> 4-bit/ternary models (Ollama GGUF; PrismML Ternary Bonsai 1.7B). See
+> [`docs/local-models.md`](local-models.md). Not built yet.
+
 ### The `imageio-ffmpeg` substitution (🔜, small)
 
 `spaces_backend._video_thumb` already checks `shutil.which("ffmpeg")`. Add a
