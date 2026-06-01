@@ -214,12 +214,17 @@ def register(app: FastAPI, b) -> None:
                 thumb = f"/api/fb/files?path={quote(str(img))}&w=400"
             elif p.get("video_path"):
                 thumb = f"/api/fb/vthumb?path={quote(str(p['video_path']))}&w=400"
+            ptype = str(p.get("type") or "status")
             out.append({"id": r["id"], "date": date, "title": r["title"],
-                        "type": str(p.get("type") or "status"),
+                        "type": ptype,
                         "excerpt": r["summary"], "thumb": thumb, "url": "", "vid": vid,
-                        # "meaningless": no media, no link, no original to open, and
-                        # no real text (empty or title==text) — hidden by default.
-                        "meaningless": bool(r.get("empty"))})
+                        # "meaningless" (hidden by default): empty posts (no media,
+                        # no link, title==text) OR any reshare ("share") — Facebook
+                        # strips the reshared original and the only link we could
+                        # synthesize (facebook.com/<fbid>) doesn't resolve, so a
+                        # bare reshare is meaningless. Reshares that DID keep a real
+                        # original link are type "link", not "share", and stay.
+                        "meaningless": bool(r.get("empty")) or ptype == "share"})
         out.sort(key=lambda r: r["date"], reverse=True)  # newest first
         return JSONResponse(out)
 

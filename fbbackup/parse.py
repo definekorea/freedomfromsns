@@ -135,50 +135,7 @@ def _share_links(posts_dir: Path) -> dict[int, str]:
     return out
 
 
-def _fbid_index(posts_dir: Path) -> tuple[dict[int, str], dict[str, str]]:
-    """Map a post → its Facebook post id (``fbid``) so we can link reshares back
-    to the original on Facebook (the export strips reshared content, but these
-    two sidecars carry the post's own fbid). Keyed by exact timestamp AND by a
-    text prefix (edit timestamps differ from the post's creation time, so text
-    catches what timestamp misses). ``content_sharing_links`` also carries the
-    *original* URL, handled separately by ``_share_links``.
-    """
-    by_ts: dict[int, str] = {}
-    by_text: dict[str, str] = {}
-    for fn in ("edits_you_made_to_posts.json", "content_sharing_links_you_have_created.json"):
-        f = posts_dir / fn
-        if not f.is_file():
-            continue
-        try:
-            data = json.load(open(f, encoding="utf-8"))
-        except Exception:
-            continue
-        for e in data if isinstance(data, list) else []:
-            fb = e.get("fbid")
-            if not fb:
-                continue
-            ts = e.get("timestamp")
-            if ts:
-                by_ts.setdefault(int(ts), fb)
-            for lv in e.get("label_values", []) or []:
-                if lv.get("label") == "Text" and lv.get("value"):
-                    k = " ".join((fix(lv["value"]) or "").split())[:60]
-                    if len(k) >= 25:
-                        by_text.setdefault(k, fb)
-    return by_ts, by_text
-
-
-def _lookup_fbid(ts: int, text: str, fbid_ts: dict, fbid_tx: dict) -> str:
-    if ts and ts in fbid_ts:
-        return fbid_ts[ts]
-    k = " ".join((text or "").split())[:60]
-    if len(k) >= 25 and k in fbid_tx:
-        return fbid_tx[k]
-    return ""
-
-
-def normalize_post(post: dict, subfolders, by_name, share_links: dict | None = None,
-                   fbid_ts: dict | None = None, fbid_tx: dict | None = None) -> dict:
+def normalize_post(post: dict, subfolders, by_name, share_links: dict | None = None) -> dict:
     title = fix(post.get("title", "")) or ""
     text = _post_text(post)
 
@@ -235,11 +192,11 @@ def normalize_post(post: dict, subfolders, by_name, share_links: dict | None = N
     # your_posts has none — gives empty reshares a clickable Facebook permalink.
     if not links and share_links and ts in share_links:
         links.append({"url": share_links[ts], "name": "", "source": "Facebook"})
-    # The post's own Facebook permalink (for "view original on Facebook" on
-    # reshares whose original content the export drops). fbid found by exact
-    # timestamp or text-prefix in the edits/sharing-links sidecars.
-    fbid = _lookup_fbid(ts, text, fbid_ts or {}, fbid_tx or {})
-    fb_url = f"https://www.facebook.com/{fbid}" if fbid else ""
+    # NOTE: we used to synthesize the post's own facebook.com/<fbid> permalink
+    # for reshares, but the bare-id form is login-gated and unreliable (it never
+    # resolved), so we don't fake links anymore — fb_url stays empty and reshares
+    # without a real original link are hidden by default.
+    fb_url = ""
 
     hashtag_src = " ".join([text] + [m["caption"] for m in media])
     hashtags = sorted(set(_HASHTAG_RE.findall(hashtag_src)))
@@ -330,19 +287,14 @@ def parse(export_root: Path, out_dir: Path) -> dict:
         raise SystemExit(f"No posts files ({POSTS_GLOB}) found under {export_root}")
 
     share_links: dict[int, str] = {}
-    fbid_ts: dict[int, str] = {}
-    fbid_tx: dict[str, str] = {}
     for posts_dir in {pf.parent for pf in posts_files}:
         share_links.update(_share_links(posts_dir))
-        ts_map, tx_map = _fbid_index(posts_dir)
-        fbid_ts.update(ts_map)
-        fbid_tx.update(tx_map)
 
     records: list[dict] = []
     for pf in posts_files:
         with open(pf, encoding="utf-8") as fh:
             for raw in json.load(fh):
-                records.append(normalize_post(raw, subfolders, by_name, share_links, fbid_ts, fbid_tx))
+                records.append(normalize_post(raw, subfolders, by_name, share_links))
 
     before = len(records)
     records = _merge_same_timestamp(records)  # collapse FB's reshare-split duplicates

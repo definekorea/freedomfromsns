@@ -46,6 +46,7 @@ def materialize(
 
     new = updated = skipped = 0
     written = 0
+    written_paths: set[Path] = set()
     with posts_path.open(encoding="utf-8") as fh:
         for line in fh:
             post = json.loads(line)
@@ -72,14 +73,31 @@ def materialize(
             else:
                 new += 1
             target.write_text(content, encoding="utf-8")
+            written_paths.add(target.resolve())
             written += 1
             if written % 4000 == 0:
                 print(f"  …{written} rows written")
             if limit and written >= limit:
                 break
 
+    # Remove stale rows from a prior run (e.g. posts that merged or changed slug),
+    # so the browse index never reads orphaned md files. Only on a FULL run, and
+    # never touch live-imported rows/media (kept under "_live*") or history.
+    removed = 0
+    if not (since or until or types or limit):
+        for p in ws_dir.rglob("*.md"):
+            rel = p.relative_to(ws_dir)
+            if any(part.startswith((".", "_live")) for part in rel.parts):
+                continue
+            if p.resolve() not in written_paths:
+                try:
+                    p.unlink()
+                    removed += 1
+                except OSError:
+                    pass
+
     stats = {"out": str(ws_dir), "written": written, "new": new,
-             "updated": updated, "skipped": skipped}
+             "updated": updated, "skipped": skipped, "removed_stale": removed}
     print(json.dumps(stats, indent=2))
     return stats
 

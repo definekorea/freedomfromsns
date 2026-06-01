@@ -368,7 +368,12 @@
     document.addEventListener("keydown", function (e) { if (e.key === "Escape" && els.modal.classList.contains("on")) closePost(); });
     document.body.appendChild(els.modal);
   }
-  function closeModal() { if (els.modal) { els.modal.classList.remove("on"); document.body.style.overflow = ""; } }
+  function closeModal() {
+    if (!els.modal) return;
+    // stop any playing media — hiding the modal alone leaves the <video> playing.
+    els.modal.querySelectorAll("video,audio").forEach(function (v) { try { v.pause(); v.removeAttribute("src"); v.load(); } catch (e) { } });
+    els.modal.classList.remove("on"); document.body.style.overflow = "";
+  }
   // Close the post the SAME way regardless of trigger (× / Esc / backdrop): pop
   // the #post history entry so the URL, history, and view stay in sync. (The ×,
   // Esc, and backdrop all used to differ — Esc/backdrop just hid the modal and
@@ -415,7 +420,7 @@
         md = md.replace(/\[▶[^\]]*\]\((\/api\/fb\/files[^)\s]+)\)/g, function (_, u) { vids.push(u); return ""; });
         content.innerHTML = mdToHtml(md);
         body.appendChild(content);
-        vids.forEach(function (u) { var v = el("video", "fb-doc-vid"); v.src = u; v.controls = true; v.preload = "metadata"; v.playsInline = true; content.appendChild(v); });
+        vids.forEach(function (u, vi) { var v = el("video", "fb-doc-vid"); v.src = u; v.controls = true; v.preload = "metadata"; v.playsInline = true; if (vi === 0) v.autoplay = true; content.appendChild(v); if (vi === 0) v.play().catch(function () { }); });
         var imgs = content.querySelectorAll("img.fb-md-img");
         var media = []; imgs.forEach(function (im) { media.push({ url: im.getAttribute("src"), type: "image", post_id: id, post_title: obj.title || "" }); });
         imgs.forEach(function (im, ix) { im.style.cursor = "zoom-in"; im.onclick = function () { openLightbox(media, ix); }; });
