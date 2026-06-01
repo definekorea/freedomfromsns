@@ -311,3 +311,7 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
 .fb-chip.sec { color: #8a8a90; border-color: #34343a; background: #161619; }
 .fb-chip.sec:hover { color: #b9a8e0; }
 .fb-chip.sec.on { background: #2a2340; color: #c9b8f0; border-color: #4a3f72; }
+
+/* card text preview — FB posts have no real title, so one prominent block */
+.fb-text { font-size: .9rem; line-height: 1.45; color: var(--fg, #e8e8ea); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; word-break: break-word; }
+.fb-text-site { font-size: .72rem; color: #8a8a90; text-transform: uppercase; letter-spacing: .02em; margin-top: .35rem; }

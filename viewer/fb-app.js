@@ -210,14 +210,16 @@
     c.appendChild(thumb);
     var body = el("div", "fb-body");
     body.appendChild(el("div", "fb-date", fmtDate(p.date)));
-    var titleEl = el("div", "fb-title", p.title || "(무제)"); body.appendChild(titleEl);
-    var exEl = p.excerpt ? el("div", "fb-ex", p.excerpt) : null; if (exEl) body.appendChild(exEl);
+    // Facebook posts have no real title — `title` is just the first line of text —
+    // so show ONE prominent text preview, not the same line twice.
+    var textEl = el("div", "fb-text", p.preview || p.excerpt || p.title || "");
+    body.appendChild(textEl);
     c.appendChild(body);
-    // link cards show the ACTUAL link preview (image + title/site) instead of a 🔗
-    if (p.type === "link" && p.link_url && !p.thumb) enrichLinkCard(p, thumb, titleEl, body, exEl);
+    // link cards show the ACTUAL link preview (image + headline/site) instead of a 🔗
+    if (p.type === "link" && p.link_url && !p.thumb) enrichLinkCard(p, thumb, textEl, body);
     return c;
   }
-  function enrichLinkCard(p, thumb, titleEl, body, exEl) {
+  function enrichLinkCard(p, thumb, textEl, body) {
     unfurl(p.link_url).then(function (d) {
       if (!d || !d.ok) return;
       if (d.image) {
@@ -226,10 +228,10 @@
         im.onerror = function () { im.remove(); thumb.classList.add("ph"); thumb.dataset.ic = "🔗"; };
         thumb.appendChild(im);
       }
-      // if the post has no real comment (just "shared a link" or a bare URL), show the preview's title/site
-      var generic = !p.title || /shared a (link|post|memory)/i.test(p.title) || /^https?:\/\//.test(p.title);
-      if (d.title && generic) titleEl.textContent = decodeEnt(d.title);
-      if (d.site) { if (!exEl) { exEl = el("div", "fb-ex", ""); body.appendChild(exEl); } exEl.textContent = decodeEnt(d.site); }
+      // no real comment (just "shared a link" or empty) → lead with the headline
+      var generic = !(p.preview && p.preview.trim()) || /shared a (link|post|memory)/i.test(p.title || "");
+      if (d.title && generic) textEl.textContent = decodeEnt(d.title);
+      if (d.site) body.appendChild(el("div", "fb-text-site", decodeEnt(d.site)));
     });
   }
 

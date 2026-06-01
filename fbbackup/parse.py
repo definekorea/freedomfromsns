@@ -35,6 +35,11 @@ POSTS_GLOB = "your_posts__check_ins__photos_and_videos_*.json"
 _VIDEO_EXTS = {".mp4", ".mov", ".webm", ".avi", ".mkv", ".gif"}
 _HASHTAG_RE = re.compile(r"#(\w+)", re.UNICODE)
 _GROUP_RE = re.compile(r"to the group:\s*(.+?)\.?\s*$")
+# FB action line for a reshare ("X shared a/an link/post/memory/reel/group/…").
+_RESHARE_RE = re.compile(r"\bshared\s+(a|an|his|her|their|the)\b", re.I)
+# A reshare with at least this much comment text is treated as the user's own
+# substantial writing (→ 글); below it, it's a brief reshare (→ 공유). ≈ one paragraph.
+_RESHARE_KEEP_CHARS = 200
 
 # Facebook-generated framing lines inside "memory" reshares' text attachments
 # ("2 Years Ago", a date, "X added 3 new photos") — skip these so we keep only
@@ -104,8 +109,13 @@ def _classify(media: list, links: list, place, title: str, text: str) -> str:
         return "link"
     if place:
         return "checkin"
-    if "shared a memory" in title or "shared a post" in title:
-        return "share"
+    # A reshare that kept no original link/media. A brief comment (≤ ~one
+    # paragraph) → a reshare → the 공유 bucket (hidden from the main view); a
+    # longer, substantial write-up → the user's own text → 글 (shown). Length is
+    # a more robust proxy for "one paragraph" than counting blank lines, which
+    # mis-splits short captions like "Seoul\n\n#tag".
+    if _RESHARE_RE.search(title or ""):
+        return "status" if len((text or "").strip()) >= _RESHARE_KEEP_CHARS else "share"
     if text:
         return "status"
     return "other"

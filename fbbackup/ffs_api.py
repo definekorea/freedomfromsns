@@ -217,7 +217,8 @@ def register(app: FastAPI, b) -> None:
             ptype = str(p.get("type") or "status")
             out.append({"id": r["id"], "date": date, "title": r["title"],
                         "type": ptype,
-                        "excerpt": r["summary"], "thumb": thumb, "vid": vid,
+                        "excerpt": r["summary"], "preview": r.get("preview", ""),
+                        "thumb": thumb, "vid": vid,
                         "link_url": str(p.get("link_url") or ""),
                         # "empty": no media, no link, no real text (title==text) —
                         # nothing to show, hidden from every view. (Reshares are NOT

@@ -274,6 +274,9 @@ class SpacesBackend:
                     empty = trivial and not has_visual
                     row = {
                         "id": self._page_id(workspace, p), "title": title, "summary": summary,
+                        # a longer text preview for the card (FB posts have no real
+                        # title, so the card shows this, not a repeated first line).
+                        "preview": text_content[:300],
                         "props": props, "year": yr, "empty": empty,
                         "_blob": (title + " " + body + " " + tagstr).lower(),
                     }
