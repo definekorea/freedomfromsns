@@ -1,20 +1,29 @@
 # FreedomFromSNS
 
 Browse, search, and **chat with your Facebook archive** — entirely on your own
-machine. Point it at a Facebook "Download Your Information" (JSON) export and it
-becomes a fast, private, searchable timeline with an AI that can actually open
-your posts and show you the photos in them.
+machine, fast and private. Point it at a Facebook "Download Your Information"
+(JSON) export and it becomes a searchable timeline of **your own posts**, with an
+AI that opens them and shows you the photos.
 
-- **Local-first & private** — your export is read-only and never leaves your
-  machine. No cloud middleman.
+Built on four principles — **simplicity, speed, convenience, and a focus on your
+own postings** (your photos / videos / writing, not the reshares you forwarded).
+See [`docs/principles.md`](docs/principles.md).
+
+- **Your content first** — the default feed is what *you* posted. Reshares (whose
+  originals Facebook strips from the export and can't be linked back) and
+  content-less posts are tucked into click-into buckets (공유 · 링크 · 미분류),
+  not the main timeline.
+- **Fast & local** — browse/calendar/search render client-side; image + video
+  thumbnails and link previews are cached; nothing leaves your machine and the
+  export is read-only.
 - **Gemini-only** — one API key powers both the semantic index and the chat
   (embeddings: `gemini-embedding-001`; chat: `gemini-2.5-flash` / `-3.1-pro`,
   selectable in the UI).
-- **Agentic chat** — the AI uses tools (`search_archive`, `get_post`,
-  `get_link_preview`) to explore your archive and answer with the *real* photos,
-  links, and text from your own posts — grounded, no hallucinated URLs.
-- **Rich browsing** — grid + calendar views, instant keyword + semantic search,
-  a full-screen image lightbox.
+- **AI chat, first-class** — a grounded RAG or an agentic Gemini tool-loop
+  (`search_archive`, `get_post`, `get_link_preview`) that answers from the *real*
+  photos, links, and text in your own posts — no hallucinated URLs.
+- **Rich browsing** — grid + calendar, instant keyword + semantic search, link
+  previews, video posters, a full-screen image lightbox with a position scrubber.
 
 ## Setup
 

@@ -1,14 +1,52 @@
 # FreedomFromSNS — Principles
 
-What we keep from [Weft](https://github.com/unattachedgray/Weft)'s philosophy,
-what we adapt, and what we deliberately drop. FreedomFromSNS is the **standalone
-embodiment of Weft's "Product North Star"** — but it's a far simpler project
-(single-user, local, one provider), so most of Weft's agent-framework machinery
-doesn't apply. This doc is the filter.
+FreedomFromSNS has **four core principles**. Everything else — including which
+Weft ideas we keep or drop (further below) — exists to serve them.
+
+## Core principles
+
+1. **Simplicity.** One local process, one provider (Gemini), one-step actions.
+   No jargon, no provider/tier vocabulary, no configuration mazes. Complexity is
+   *ours* to hide (a single FastAPI server, venv/`uv`-managed Python, prebuilt
+   assets), never the user's to manage. When something can be simpler, make it
+   simpler. (We deliberately collapsed Weft's 4-layer chat proxy into one local
+   process — keep it that lean.)
+
+2. **Speed.** The archive must feel *instant* even at 20k+ posts. Browse, filter,
+   and calendar render client-side from a precomputed snapshot; retrieval is a
+   deterministic embed + cosine kNN (only the synthesis is an LLM call);
+   thumbnails (image + ffmpeg video posters) and link previews are cached on
+   disk; the lightbox windows its thumbnail strip so thousands of items never
+   stall. Pre-warm and cache the slow parts.
+
+3. **Convenience.** Point at an export and go. Sensible defaults, graceful
+   fallbacks, honest "this needs X" messages (`ffs doctor`). The things you want
+   are surfaced; the noise is hidden by default. One-click navigation (open a
+   post, scrub a gallery, jump to a year) beats any CLI step.
+
+4. **Focus on your OWN postings — not reshares.** The default feed (전체) is the
+   content *you* made: your photos, videos, and writing. Reshares of other
+   people's posts — whose originals Facebook strips from the export, and which
+   can't be linked back (the post id only resolves via an uncomputable, encrypted
+   `pfbid`) — are de-emphasized into a click-into **공유** bucket, never the main
+   timeline. Links and loose media get their own click-into buckets too
+   (**링크**, **미분류**); empty/content-less posts are hidden entirely. We
+   optimize for the signal (your life), not the noise (what you forwarded).
+
+And the **AI chat is a first-class feature**, not a bolt-on: chat with your
+archive (grounded RAG, or an agentic Gemini tool-loop) so it answers from your
+*real* posts and shows your *actual* photos — the most direct expression of
+principle 4. Related features (semantic search, the gallery lightbox, link
+previews) all serve the same end: getting *you* to *your* content, fast.
+
+These four are the lens. The sections below map which of [Weft](https://github.com/unattachedgray/Weft)'s
+broader ideas support them and which we drop — FreedomFromSNS began as the
+standalone embodiment of Weft's Facebook "North Star," but it's a far simpler
+project, so most of Weft's agent-framework machinery doesn't apply.
 
 ---
 
-## 1. The North Star — adopt **whole** (this IS our mission)
+## 1. The North Star — the mission behind the principles
 
 Weft's flagship goal, stated for the Facebook build, *is* FreedomFromSNS:
 
