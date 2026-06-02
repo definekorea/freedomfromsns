@@ -26,6 +26,7 @@ import signal
 import subprocess
 import sys
 import tarfile
+import threading
 import time
 import urllib.request
 import zipfile
@@ -150,6 +151,28 @@ def stop() -> None:
         pass
     finally:
         pf.unlink(missing_ok=True)
+
+
+_starting = threading.Event()
+
+
+def ensure_started_async(key: str | None = None) -> bool:
+    """Non-blocking: if the server is already up, return True. Otherwise kick off the
+    (slow, one-time) download + load in a background thread — idempotent, so repeated
+    calls don't spawn duplicates — and return False (caller should ask the user to
+    retry shortly). Use this from request handlers so a multi-minute download never
+    blocks the server's event loop."""
+    if is_up():
+        return True
+    if not _starting.is_set():
+        _starting.set()
+        def _run():
+            try:
+                start(key)
+            finally:
+                _starting.clear()
+        threading.Thread(target=_run, daemon=True).start()
+    return False
 
 
 def start(key: str | None = None, port: int = PORT, wait: int = 150) -> bool:

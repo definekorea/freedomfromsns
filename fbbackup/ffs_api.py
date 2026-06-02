@@ -579,12 +579,15 @@ def register(app: FastAPI, b) -> None:
         if (body or {}).get("agent") and st["chat"].get("provider") == "gemini":
             from .ffs_agent import agent_chat
             return JSONResponse(agent_chat(b, clean, model))
-        if st["chat"].get("provider") == "local":   # bundled local model — make sure it's up
+        if st["chat"].get("provider") == "local":   # bundled local model
             from . import localchat
-            if not localchat.start():
-                return JSONResponse({"answer": "로컬 모델을 시작하지 못했습니다 — `ffs localchat`을 먼저 "
-                                     "실행하세요. / Couldn't start the local model — run `ffs localchat` "
-                                     "first.", "sources": [], "media": [], "model": model})
+            if not localchat.ensure_started_async():  # non-blocking: never freeze the server
+                return JSONResponse({"answer": "로컬 모델을 준비하는 중입니다 — 최초 1회 모델을 내려받고 "
+                                     "불러오느라 몇 분 걸릴 수 있어요. 잠시 후 다시 물어봐 주세요. "
+                                     "(진행 상황: ~/ffs/localchat.log) / The local model is downloading/"
+                                     "loading for the first time (a few minutes) — please ask again in a "
+                                     "moment. Progress: ~/ffs/localchat.log",
+                                     "sources": [], "media": [], "model": model})
         return JSONResponse(_chat(b, clean, model))  # one-shot RAG (any provider)
 
     @app.get("/api/settings")
