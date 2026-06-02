@@ -34,7 +34,10 @@ elif [ -f "$SCRIPT_DIR/pyproject.toml" ]; then
 else
   echo "Finding the newest FreedomFromSNS release…"
   # Use the releases LIST (newest first) — /releases/latest can lag or mis-rank.
-  SOURCE=$(curl -fsSL "https://api.github.com/repos/$REPO/releases" \
+  # Cache-bust (unique query param + no-cache) so a proxy can't serve a stale list
+  # and install an OLD version.
+  SOURCE=$(curl -fsSL -H 'Cache-Control: no-cache' \
+           "https://api.github.com/repos/$REPO/releases?per_page=100&_=$(date +%s)" \
            | grep -o 'https://[^"]*\.whl' | head -1)
   [ -n "$SOURCE" ] || { echo "No release wheel found for $REPO — has a release been published?"; exit 1; }
 fi

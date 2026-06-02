@@ -43,7 +43,11 @@ try {
     $Source = $base
   } else {
     Write-Host "Finding the newest FreedomFromSNS release…"
-    $rels = irm "https://api.github.com/repos/$Repo/releases"
+    # Cache-bust: a unique query param + no-cache headers so a proxy/CDN can't serve
+    # a stale release list (which would install an OLD version).
+    $bust = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+    $rels = irm "https://api.github.com/repos/$Repo/releases?per_page=100&_=$bust" `
+                -Headers @{ 'Cache-Control' = 'no-cache'; 'Pragma' = 'no-cache'; 'User-Agent' = 'ffs-installer' }
     $rel = $rels | Where-Object { $_.assets } |
            Sort-Object { try { [version]($_.tag_name -replace '^v', '') } catch { [version]'0.0' } } -Descending |
            Select-Object -First 1
