@@ -68,6 +68,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "embed_skip": "Skipped. You can enable smart search & chat anytime in the app.",
         "localchat_setup": "Setting up no-key local AI chat (EXAONE) in the background "
                            "(~1.5 GB, one time) — it'll be ready shortly; browse meanwhile.",
+        "chat_cli_check": "Checking for AI tools you already have (Claude Code / Codex / Antigravity)…",
+        "chat_cli":       "✓ AI chat will use your {name} — no API key, no download.",
         "tn_downloading_cf": "Downloading cloudflared (one time, ~35 MB)…",
         "tn_need_cf": "Couldn't get cloudflared automatically. Install it:",
         "tn_intro":  "A permanent address lives on your own domain (e.g. archive.yourname.com) and "
@@ -150,6 +152,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "embed_skip": "건너뛰었습니다. 스마트 검색·AI 대화는 언제든 앱에서 켤 수 있어요.",
         "localchat_setup": "백그라운드에서 무료 로컬 AI 대화(EXAONE)를 준비하는 중입니다"
                            "(최초 1회 약 1.5 GB) — 곧 준비됩니다. 그 사이 둘러보세요.",
+        "chat_cli_check": "이미 설치된 AI 도구를 확인하는 중입니다 (Claude Code / Codex / Antigravity)…",
+        "chat_cli":       "✓ AI 대화는 설치된 {name}을(를) 사용합니다 — API 키도, 다운로드도 필요 없어요.",
         "tn_downloading_cf": "cloudflared를 내려받는 중입니다(최초 1회, 약 35 MB)…",
         "tn_need_cf": "cloudflared를 자동으로 받지 못했습니다. 직접 설치:",
         "tn_intro":  "고정 주소는 내 도메인(예: archive.yourname.com)으로 제공되며 재시작해도 "
@@ -613,6 +617,30 @@ def spawn_background_embed(home: Path, provider: str, device: str = "", model: s
         kw["start_new_session"] = True
     subprocess.Popen([sys.executable, "-m", "fbbackup.cli", "embed"],
                      stdout=log, stderr=log, stdin=subprocess.DEVNULL, env=env, **kw)
+
+
+def usable_cli(timeout: int = 20) -> str | None:
+    """First installed AND working AI-CLI chat provider id (claude-cli → codex-cli →
+    antigravity-cli), or None. 'Working' = a tiny non-interactive prompt returns text
+    within ``timeout`` — so a CLI that's installed but not logged in (hangs/errors) is
+    skipped. Lets setup prefer a no-key, no-download chat backend the user already has."""
+    import shutil
+    import subprocess
+    from . import providers
+    for pid in ("claude-cli", "codex-cli", "antigravity-cli"):
+        cat = providers.CHAT_PROVIDERS.get(pid) or {}
+        exe = shutil.which(cat.get("bin", "")) if cat.get("bin") else None
+        if not exe:
+            continue
+        try:
+            r = subprocess.run([exe, *cat["args"], "Reply with exactly: ok"],
+                               capture_output=True, text=True, timeout=timeout,
+                               encoding="utf-8", errors="replace")
+            if (r.stdout or "").strip():
+                return pid
+        except Exception:  # noqa: BLE001 — not logged in / timeout / crash → skip
+            continue
+    return None
 
 
 def spawn_background_localchat(home: Path, model: str = "exaone") -> None:

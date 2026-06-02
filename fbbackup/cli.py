@@ -357,14 +357,6 @@ def cmd_setup(args) -> int:
             say("embed_started_est", min=test.get("est_min", 0))
         elif test.get("deps"):
             say("local_lowmem")   # would OOM on this machine → keyword search + offer a key
-        # Local path → also wire no-key local CHAT (EXAONE), downloaded in the
-        # background so Tier 2 works offline too. Chosen because it's the strongest
-        # small model on Korean (see docs/local-models.md); the chat route serves it.
-        from fbbackup import providers
-        providers.save_settings({"chat": {"provider": "local", "fast_model": "local",
-                                          "precise_model": "local"}})
-        say("localchat_setup")
-        wiz.spawn_background_localchat(home)
     elif choice == "gemini":
         from .embed import gemini_key
         from . import providers
@@ -382,6 +374,27 @@ def cmd_setup(args) -> int:
             say("embed_skip")
     else:
         say("embed_skip")
+
+    # 3b. Chat (Tier 2) provider — decided separately from embeddings. Priority:
+    #   a Gemini key (richest, agentic) → a working local AI CLI you already have
+    #   (Claude Code / Codex / Antigravity — no key, no download) → the bundled local
+    #   model (EXAONE) on the local path. A keyless user with none of these gets the
+    #   local model lazily on first chat (the keyless→local fallback).
+    if not args.yes:
+        from fbbackup import providers
+        from .embed import gemini_key
+        if not gemini_key():
+            say("chat_cli_check")
+            cli = wiz.usable_cli()
+            if cli:
+                providers.save_settings({"chat": {"provider": cli, "fast_model": "cli",
+                                                  "precise_model": "cli"}})
+                say("chat_cli", name=providers.CHAT_PROVIDERS[cli]["label"])
+            elif choice == "local":
+                providers.save_settings({"chat": {"provider": "local", "fast_model": "local",
+                                                  "precise_model": "local"}})
+                say("localchat_setup")
+                wiz.spawn_background_localchat(home)
 
     # 4. One-click relaunch: a desktop launcher (unless told otherwise).
     if not getattr(args, "no_shortcut", False):
