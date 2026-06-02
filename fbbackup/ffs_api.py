@@ -348,6 +348,23 @@ def _chat(b, messages: list[dict], model: str, settings: dict | None = None) -> 
         media.extend(_media_of(raw, r["id"], title))
         sources.append({"id": r["id"], "title": title})
 
+    # "show me (those) photos" intent: if the user wants to SEE media but retrieval
+    # surfaced none, pull recent media-bearing posts so the gallery is never empty —
+    # the photos then show below the answer regardless of how the model phrases it.
+    ql = query.lower()
+    wants_media = any(t in ql for t in ("사진", "영상", "그림", "보여", "갤러리",
+                                        "photo", "picture", "image", "gallery", "show", "see"))
+    if wants_media and not media:
+        idx = b._ensure_index("default")
+        media_rows = sorted((r for r in idx["rows"] if r.get("media")),
+                            key=lambda r: str(r["props"].get("date", "")), reverse=True)
+        for r in media_rows[:12]:
+            raw = b._row_text(r)
+            title = r["title"]
+            ctx.append(f"[{r['props'].get('date', '?')}] {title}: {_plain(raw)[:300]}")
+            media.extend(_media_of(raw, r["id"], title))
+            sources.append({"id": r["id"], "title": title})
+
     # dedup media by URL (a post can repeat an image), keep order, cap the payload
     seen, flat = set(), []
     for it in media:
