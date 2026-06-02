@@ -190,8 +190,12 @@ def _openai_chat(base, key, model, messages, system, max_tokens, temperature):
     headers = {"Content-Type": "application/json"}
     if key:
         headers["Authorization"] = f"Bearer {key}"
+    # A local model server (Bonsai/EXAONE/Qwen on CPU) is much slower than a hosted
+    # API — give it a generous timeout so replies don't get cut off mid-generation.
+    is_local = "127.0.0.1" in base or "localhost" in base
     d = _post(base.rstrip("/") + "/chat/completions",
-              {"model": model, "messages": msgs, "max_tokens": max_tokens, "temperature": temperature}, headers)
+              {"model": model, "messages": msgs, "max_tokens": max_tokens, "temperature": temperature},
+              headers, timeout=600 if is_local else 120)
     return ((d.get("choices") or [{}])[0].get("message") or {}).get("content", "").strip()
 
 

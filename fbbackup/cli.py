@@ -197,8 +197,11 @@ def cmd_setup(args) -> int:
     home = _home()
     home.mkdir(parents=True, exist_ok=True)   # first run: create the per-user state dir
     os.environ["FBBACKUP_HOME"] = str(home)   # pin it so providers/embed/background all agree
-    lang = args.lang or wiz.detect_lang()
-    if not args.lang and not args.yes:  # offer a language choice unless told
+    # Language: --lang flag or FFS_LANG (the installer asks this FIRST and passes it
+    # through) win; otherwise OS locale, and we offer the choice here.
+    env_lang = os.environ.get("FFS_LANG", "").strip().lower()
+    lang = args.lang or (env_lang if env_lang in ("en", "ko") else "") or wiz.detect_lang()
+    if not args.lang and env_lang not in ("en", "ko") and not args.yes:  # offer a language choice unless told
         try:
             pick = input(wiz.t(lang, "lang_prompt", d=("한국어" if lang == "ko" else "English"))).strip()
             lang = {"1": "en", "2": "ko"}.get(pick, lang)
@@ -346,8 +349,11 @@ def cmd_setup(args) -> int:
             if not test["deps"]:
                 say("install_fail")
         if test.get("viable"):
-            wiz.spawn_background_embed(home, "local", device="gpu" if hw["gpu"] else "",
-                                       model=test["model"])
+            # CPU by default: a detected GPU often isn't actually usable by onnxruntime
+            # (e.g. cuDNN missing) → it falls back to CPU anyway, with scary logs and,
+            # with a big model, a stall. MiniLM on CPU is fast + reliable. (Opt into
+            # GPU with FBBACKUP_EMBED_DEVICE=gpu.)
+            wiz.spawn_background_embed(home, "local", device="", model=test["model"])
             say("embed_started_est", min=test.get("est_min", 0))
         elif test.get("deps"):
             say("local_lowmem")   # would OOM on this machine → keyword search + offer a key

@@ -16,6 +16,15 @@ try { Start-Transcript -Path $LogFile -Force | Out-Null } catch {}
 
 $ok = $false
 try {
+  # Language FIRST — before anything else (only when there's a console to ask in).
+  # Passed to `ffs setup` via FFS_LANG so it isn't asked again.
+  if (-not $env:FFS_LANG -and $Host.Name -eq 'ConsoleHost') {
+    $l = Read-Host "Language / 언어 — [1] English  [2] 한국어 (default 1)"
+    $env:FFS_LANG = if ($l -eq '2') { 'ko' } else { 'en' }
+  }
+  if (-not $env:FFS_LANG) { $env:FFS_LANG = 'en' }
+  $ko = $env:FFS_LANG -eq 'ko'
+
   # Archive home: an explicit FBBACKUP_HOME wins; else the folder this installer runs
   # from (its own dir, or the current dir for the one-liner) IF that's a DEDICATED
   # folder (e.g. D:\ffs) — not a transient one (Downloads/Desktop/Documents/home/temp),
@@ -55,12 +64,13 @@ try {
     # Optional version picker: set FFS_PICK=1 (install-ffs.bat does) to choose a
     # version interactively; default (Enter) is the latest. Only when interactive.
     if ($env:FFS_PICK -and $sorted.Count -gt 1 -and $Host.Name -eq 'ConsoleHost') {
-      Write-Host "`nAvailable versions (newest first):"
+      Write-Host ("`n" + $(if ($ko) { "설치 가능한 버전 (최신순):" } else { "Available versions (newest first):" }))
       $max = [Math]::Min(10, $sorted.Count)
+      $tagLatest = if ($ko) { "  (최신)" } else { "  (latest)" }
       for ($i = 0; $i -lt $max; $i++) {
-        Write-Host ("  [{0}] {1}{2}" -f ($i + 1), $sorted[$i].tag_name, $(if ($i -eq 0) { "  (latest)" } else { "" }))
+        Write-Host ("  [{0}] {1}{2}" -f ($i + 1), $sorted[$i].tag_name, $(if ($i -eq 0) { $tagLatest } else { "" }))
       }
-      $pick = Read-Host "Pick a number to install (Enter = latest)"
+      $pick = Read-Host $(if ($ko) { "설치할 번호를 고르세요 (엔터 = 최신)" } else { "Pick a number to install (Enter = latest)" })
       if ($pick -match '^\d+$' -and [int]$pick -ge 1 -and [int]$pick -le $max) { $rel = $sorted[[int]$pick - 1] }
     }
     $Source = ($rel.assets | Where-Object { $_.name -like '*.whl' } | Select-Object -First 1).browser_download_url

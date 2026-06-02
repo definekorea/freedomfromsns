@@ -438,14 +438,16 @@ def detect_hardware() -> dict:
             "providers": _ort_providers(), "recommend": "local" if local_ok else "key"}
 
 
-# Curated model selection: which local model fits this machine (or fall to a key).
+# Curated model selection: which local embedding model to use.
 def recommend_embed(hw: dict) -> dict:
-    """Pick from the curated registry by hardware: GPU → 'large', capable → 'mini',
-    weak/uncertain → recommend a cloud key. The micro-bench then confirms."""
+    """Default to the small, fast, light **mini** (MiniLM, 384-d) model everywhere.
+
+    We deliberately do NOT auto-pick the big 1024-d 'large' model on GPU machines:
+    nvidia-smi seeing a GPU does NOT mean onnxruntime can use it (e.g. cuDNN missing),
+    and then 'large' silently runs on CPU — huge, slow, OOM-prone (the cause of stuck
+    "smart indexing"). mini is reliable on any machine and quick on CPU. A user with a
+    confirmed working GPU can opt into large via FBBACKUP_EMBED_MODEL + EMBED_DEVICE=gpu."""
     from .embed import EMBED_MODELS
-    if hw.get("gpu") or any("CUDA" in p for p in hw.get("providers", [])):
-        return {"mode": "local", "model_key": "large", "model": EMBED_MODELS["large"]["id"]}
-    # Apple Silicon or a normal multi-core CPU → the small multilingual model
     return {"mode": "local", "model_key": "mini", "model": EMBED_MODELS["mini"]["id"]}
 
 

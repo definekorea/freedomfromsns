@@ -358,12 +358,15 @@ def _chat(b, messages: list[dict], model: str, settings: dict | None = None) -> 
         idx = b._ensure_index("default")
         media_rows = sorted((r for r in idx["rows"] if r.get("media")),
                             key=lambda r: str(r["props"].get("date", "")), reverse=True)
-        for r in media_rows[:12]:
+        for n, r in enumerate(media_rows):
             raw = b._row_text(r)
             title = r["title"]
-            ctx.append(f"[{r['props'].get('date', '?')}] {title}: {_plain(raw)[:300]}")
+            if n < 10:   # only the first few feed the text context (keeps the prompt small)
+                ctx.append(f"[{r['props'].get('date', '?')}] {title}: {_plain(raw)[:300]}")
+                sources.append({"id": r["id"], "title": title})
             media.extend(_media_of(raw, r["id"], title))
-            sources.append({"id": r["id"], "title": title})
+            if len(media) >= 80:   # gather a generous gallery (dozens of photos)
+                break
 
     # dedup media by URL (a post can repeat an image), keep order, cap the payload
     seen, flat = set(), []
@@ -373,6 +376,20 @@ def _chat(b, messages: list[dict], model: str, settings: dict | None = None) -> 
         seen.add(it["url"])
         flat.append(it)
     flat = flat[:80]
+
+    # Local model + a "show/how-many photos" request → answer DETERMINISTICALLY from
+    # the index (exact counts) and show the gallery, skipping the slow local LLM
+    # (a 2.4B model on CPU times out building a long RAG reply). Accurate + instant.
+    prov = (settings or providers.load_settings())["chat"].get("provider")
+    if wants_media and prov == "local":
+        idx = b._ensure_index("default")
+        tot_p = sum(1 for r in idx["rows"] for m in (r.get("media") or []) if m.get("type") != "video")
+        tot_v = sum(1 for r in idx["rows"] for m in (r.get("media") or []) if m.get("type") == "video")
+        ans = f"보관소에 사진 {tot_p}장, 영상 {tot_v}개가 있어요."
+        if flat:
+            ans += f" 아래에 {len(flat)}개를 보여드립니다"
+            ans += " — 전체는 위쪽 ‘사진’ 탭에서 한 번에 넘겨볼 수 있어요." if (tot_p + tot_v) > len(flat) else "."
+        return {"answer": ans, "sources": sources, "media": flat, "model": model}
 
     # representative inline images: round-robin across posts (not the first 8 of
     # one post). The model picks WHERE/WHICH by NUMBER only — it never writes a
