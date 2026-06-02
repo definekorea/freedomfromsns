@@ -12,8 +12,10 @@ echo.
 echo  Double-click this file again any time to UPDATE to the
 echo  newest version. Your archive data is never touched.
 echo.
-echo  Working... (a setup window will open shortly)
+echo  It will list the available versions so you can pick one
+echo  (just press Enter for the newest).
 echo.
+set "FFS_PICK=1"
 powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/definekorea/freedomfromsns/master/install-ffs.ps1 | iex"
 echo.
 echo  ------------------------------------------------------------

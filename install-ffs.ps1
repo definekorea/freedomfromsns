@@ -42,18 +42,30 @@ try {
   } elseif ($IsCheckout) {
     $Source = $base
   } else {
-    Write-Host "Finding the newest FreedomFromSNS release…"
+    Write-Host "Finding FreedomFromSNS releases…"
     # Cache-bust: a unique query param + no-cache headers so a proxy/CDN can't serve
     # a stale release list (which would install an OLD version).
     $bust = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
     $rels = irm "https://api.github.com/repos/$Repo/releases?per_page=100&_=$bust" `
                 -Headers @{ 'Cache-Control' = 'no-cache'; 'Pragma' = 'no-cache'; 'User-Agent' = 'ffs-installer' }
-    $rel = $rels | Where-Object { $_.assets } |
-           Sort-Object { try { [version]($_.tag_name -replace '^v', '') } catch { [version]'0.0' } } -Descending |
-           Select-Object -First 1
+    $sorted = @($rels | Where-Object { $_.assets } |
+                Sort-Object { try { [version]($_.tag_name -replace '^v', '') } catch { [version]'0.0' } } -Descending)
+    if (-not $sorted) { throw "No release wheel found for $Repo — has a release been published?" }
+    $rel = $sorted[0]
+    # Optional version picker: set FFS_PICK=1 (install-ffs.bat does) to choose a
+    # version interactively; default (Enter) is the latest. Only when interactive.
+    if ($env:FFS_PICK -and $sorted.Count -gt 1 -and $Host.Name -eq 'ConsoleHost') {
+      Write-Host "`nAvailable versions (newest first):"
+      $max = [Math]::Min(10, $sorted.Count)
+      for ($i = 0; $i -lt $max; $i++) {
+        Write-Host ("  [{0}] {1}{2}" -f ($i + 1), $sorted[$i].tag_name, $(if ($i -eq 0) { "  (latest)" } else { "" }))
+      }
+      $pick = Read-Host "Pick a number to install (Enter = latest)"
+      if ($pick -match '^\d+$' -and [int]$pick -ge 1 -and [int]$pick -le $max) { $rel = $sorted[[int]$pick - 1] }
+    }
     $Source = ($rel.assets | Where-Object { $_.name -like '*.whl' } | Select-Object -First 1).browser_download_url
-    if (-not $Source) { throw "No release wheel found for $Repo — has a release been published?" }
-    Write-Host "  release: $($rel.tag_name)"
+    if (-not $Source) { throw "No release wheel found for $($rel.tag_name)." }
+    Write-Host "  installing: $($rel.tag_name)"
   }
   Write-Host "  source: $Source`n"
 
