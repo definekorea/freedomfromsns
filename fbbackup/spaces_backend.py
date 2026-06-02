@@ -28,6 +28,7 @@ import hmac
 import json
 import pickle
 import re
+import sys
 import threading
 import time
 from pathlib import Path
@@ -343,15 +344,16 @@ class SpacesBackend:
                     m = json.loads(meta.read_text(encoding="utf-8"))
                     ent["threshold"] = float(m.get("threshold", 0.62))
                     ent["provider"] = m.get("provider", "gemini")
+                    ent["model"] = m.get("model", "")    # query with the SAME model
         except Exception:
             ent["emb"] = None
         self._emb_cache[workspace] = ent
 
-    def _embed_query(self, q: str, provider: str):
+    def _embed_query(self, q: str, provider: str, model: str = ""):
         try:
             import numpy as np
             from .embed import embed_query
-            v = np.asarray(embed_query(q, provider), dtype="float32")
+            v = np.asarray(embed_query(q, provider, model or None), dtype="float32")
             return v / (np.linalg.norm(v) + 1e-9)
         except Exception:
             return None
@@ -362,8 +364,18 @@ class SpacesBackend:
         if ent["emb"] is None or not ent["ids"]:
             return []
         import numpy as np
-        qv = self._embed_query(q, ent["provider"])
+        qv = self._embed_query(q, ent["provider"], ent.get("model", ""))
         if qv is None:
+            return []
+        # Guard against a corpus/query embedding-dimension mismatch (index built with
+        # a different model than the query). Skip semantic (keyword still works) and
+        # warn once, instead of crashing the request with a matmul error.
+        if qv.shape[0] != ent["emb"].shape[1]:
+            if not ent.get("_dim_warned"):
+                ent["_dim_warned"] = True
+                print(f"warning: search index was built with a {ent['emb'].shape[1]}-dim model but "
+                      f"queries are {qv.shape[0]}-dim — run `ffs embed` to rebuild it. Semantic search "
+                      f"is off until then (keyword search still works).", file=sys.stderr, flush=True)
             return []
         sims = ent["emb"] @ qv
         order = np.argsort(-sims)

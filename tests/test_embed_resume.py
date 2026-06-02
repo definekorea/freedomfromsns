@@ -88,7 +88,7 @@ def test_gpu_device_opt_in(monkeypatch):
     class FakeTE:
         def __init__(self, model, **kw):
             seen.update(kw)
-    monkeypatch.setattr(E, "_LOCAL", None)
+    monkeypatch.setattr(E, "_LOCAL", {})   # model_id → model cache (per-model)
     monkeypatch.setitem(os.environ, "FBBACKUP_EMBED_DEVICE", "")
     import sys
     import types
@@ -97,9 +97,9 @@ def test_gpu_device_opt_in(monkeypatch):
     monkeypatch.setitem(sys.modules, "fastembed", fake_mod)
     E._local_model()
     assert "providers" not in seen
-    E._LOCAL = None
+    E._LOCAL = {}
     seen.clear()
     monkeypatch.setitem(os.environ, "FBBACKUP_EMBED_DEVICE", "gpu")
     E._local_model()
     assert seen.get("providers") == ["CUDAExecutionProvider", "CPUExecutionProvider"]
-    E._LOCAL = None
+    E._LOCAL = {}

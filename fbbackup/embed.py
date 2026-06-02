@@ -91,30 +91,31 @@ def _gemini_one(text: str, key: str, task: str) -> list[float]:
 
 
 # ── local (fastembed) ────────────────────────────────────────────────────────
-_LOCAL = None
+_LOCAL: dict = {}   # model_id → TextEmbedding (cached per model so query-time can
+                    # use the SAME model the corpus was embedded with — see embed_query)
 
 
-def _local_model():
-    global _LOCAL
-    if _LOCAL is None:
+def _local_model(model_id: str | None = None):
+    mid = model_id or LOCAL_MODEL
+    if mid not in _LOCAL:
         from fastembed import TextEmbedding
         # GPU is opt-in (needs the `fbbackup[gpu]` extra → onnxruntime-gpu). The
         # setup wizard sets FBBACKUP_EMBED_DEVICE=gpu when it detects a GPU;
         # CUDA→CPU fallback is automatic if the GPU provider isn't available.
         if os.environ.get("FBBACKUP_EMBED_DEVICE", "").lower() == "gpu":
-            _LOCAL = TextEmbedding(LOCAL_MODEL, providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
+            _LOCAL[mid] = TextEmbedding(mid, providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
         else:
-            _LOCAL = TextEmbedding(LOCAL_MODEL)
-    return _LOCAL
+            _LOCAL[mid] = TextEmbedding(mid)
+    return _LOCAL[mid]
 
 
-def _local_embed(texts: list[str], is_query: bool) -> list[list[float]]:
+def _local_embed(texts: list[str], is_query: bool, model: str | None = None) -> list[list[float]]:
     # jina-v3 / e5 / arctic are asymmetric; the query/passage prefixes matter.
     # Small batch by default: jina-v3's attention is memory-heavy — batch 256 OOMs
     # even a 24GB GPU. FBBACKUP_EMBED_BATCH tunes it (raise for lighter models).
     pfx = "query: " if is_query else "passage: "
     bs = int(os.environ.get("FBBACKUP_EMBED_BATCH", "16"))
-    return [list(map(float, v)) for v in _local_model().embed([pfx + t for t in texts], batch_size=bs)]
+    return [list(map(float, v)) for v in _local_model(model).embed([pfx + t for t in texts], batch_size=bs)]
 
 
 # ── batched embedding + resumable checkpoint ─────────────────────────────────
@@ -188,11 +189,11 @@ def _clear_ckpt(out_dir: Path) -> None:
 
 
 # ── unified API (used by the backend for the query, and embed() for the bulk) ─
-def embed_query(text: str, provider: str | None = None) -> list[float]:
+def embed_query(text: str, provider: str | None = None, model: str | None = None) -> list[float]:
     provider = provider or resolve_provider()
     if provider == "gemini":  # keys resolved per provider
         return _gemini_one(text, gemini_key(), "RETRIEVAL_QUERY")
-    return _local_embed([text], True)[0]
+    return _local_embed([text], True, model)[0]   # query with the corpus's own model
 
 
 def _content(text: str) -> str:
