@@ -663,6 +663,36 @@ def create_launcher(home: Path, name: str = "FreedomFromSNS", cli: str = "serve 
         return None
 
 
+def model_cache_dirs() -> list[Path]:
+    """Big downloaded-model caches that uninstall/reinstall KEEP by default (so a
+    reinstall is instant): the local-chat models + llama-server, and the local-search
+    embedding model cache. Returned so the uninstaller can tell the user where the
+    space is, to reclaim if they want."""
+    import tempfile
+    lc = (Path(os.environ.get("LOCALAPPDATA", Path.home())) / "ffs" / "localchat"
+          if os.name == "nt" else Path.home() / ".cache" / "ffs" / "localchat")
+    cands = [lc, Path(tempfile.gettempdir()) / "fastembed_cache", Path.home() / ".cache" / "fastembed"]
+    if os.environ.get("FASTEMBED_CACHE_PATH"):
+        cands.append(Path(os.environ["FASTEMBED_CACHE_PATH"]))
+    out, seen = [], set()
+    for d in cands:
+        try:
+            r = d.resolve()
+        except OSError:
+            continue
+        if d.is_dir() and r not in seen:
+            seen.add(r)
+            out.append(d)
+    return out
+
+
+def dir_size_mb(p: Path) -> int:
+    try:
+        return int(sum(f.stat().st_size for f in Path(p).rglob("*") if f.is_file()) / (1024 * 1024))
+    except Exception:  # noqa: BLE001
+        return 0
+
+
 def remove_app_artifacts(home: Path) -> list[str]:
     """Remove launchers, the auto-start entry, and caches — but NEVER the data home
     (data/index/archive/config/.env stay). Returns the paths removed."""

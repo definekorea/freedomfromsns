@@ -28,4 +28,16 @@ uv tool uninstall freedomfromsns || true
 
 echo
 echo "Done. Kept: your archive at $ARCHIVE_DIR + your Cloudflare address/login (reused on reinstall)."
-echo "If you also want the data gone, delete that folder yourself."
+
+# Big downloaded-model files are KEPT by default (so a reinstall doesn't re-download
+# gigabytes). Tell the user where they are, to free the space if they want.
+shown=""
+for d in "$HOME/.cache/ffs/localchat" "${TMPDIR:-/tmp}/fastembed_cache" "$HOME/.cache/fastembed"; do
+  if [ -d "$d" ]; then
+    [ -z "$shown" ] && echo && echo "Kept downloaded AI model files (so a reinstall needs no re-download):" && shown=1
+    echo "   $d  ($(du -sh "$d" 2>/dev/null | cut -f1))"
+  fi
+done
+[ -n "$shown" ] && echo "To free that space, delete those folders (they re-download if needed)."
+echo
+echo "If you also want the data gone, delete $ARCHIVE_DIR yourself."

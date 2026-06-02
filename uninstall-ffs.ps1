@@ -24,4 +24,25 @@ uv tool uninstall freedomfromsns
 
 Write-Host ""
 Write-Host "Done. Kept: your archive at $ArchiveDir + your Cloudflare address/login (reused on reinstall)."
-Write-Host "If you also want the data gone, delete that folder yourself."
+
+# Big downloaded-model files are KEPT by default (so a reinstall doesn't re-download
+# gigabytes). Tell the user where they are + total size, so they can free space.
+$caches = @(
+  (Join-Path $env:LOCALAPPDATA 'ffs\localchat'),   # local chat: llama-server + GGUF models
+  (Join-Path $env:TEMP 'fastembed_cache'),         # local search: embedding model
+  (Join-Path $env:USERPROFILE '.cache\fastembed')
+) | Where-Object { Test-Path $_ }
+if ($caches) {
+  $total = 0
+  $rows = foreach ($d in $caches) {
+    $sz = (Get-ChildItem $d -Recurse -File -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum
+    $total += $sz
+    [pscustomobject]@{ Path = $d; MB = [Math]::Round($sz / 1MB) }
+  }
+  Write-Host ""
+  Write-Host ("Kept ~{0:N0} MB of downloaded AI model files (so a reinstall needs no re-download):" -f ($total / 1MB)) -ForegroundColor Cyan
+  foreach ($r in $rows) { Write-Host ("   {0}  (~{1:N0} MB)" -f $r.Path, $r.MB) }
+  Write-Host "To free that space, delete those folders. (Safe — they re-download if needed.)"
+}
+Write-Host ""
+Write-Host "If you also want the data gone, delete $ArchiveDir yourself."

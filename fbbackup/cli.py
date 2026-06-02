@@ -419,7 +419,15 @@ def cmd_uninstall(args) -> int:
     for r in removed:
         print(f"  - {r}")
     print(f"\n✓ Kept: your archive at {home} + your Cloudflare address/login (reused on reinstall).", flush=True)
-    print("To remove the program itself, run:  uv tool uninstall freedomfromsns")
+    caches = [(d, wiz.dir_size_mb(d)) for d in wiz.model_cache_dirs()]
+    caches = [(d, mb) for d, mb in caches if mb > 0]
+    if caches:
+        total = sum(mb for _, mb in caches)
+        print(f"\nKept ~{total} MB of downloaded AI model files (so a reinstall needs no re-download):", flush=True)
+        for d, mb in caches:
+            print(f"  - {d}  (~{mb} MB)")
+        print("  Delete those folders anytime to free the space — they re-download automatically if needed.")
+    print("\nTo remove the program itself, run:  uv tool uninstall freedomfromsns")
     return 0
 
 
