@@ -56,6 +56,18 @@ CHAT_PROVIDERS: dict[str, dict] = {
     "local": {"label": "Local model (offline, no key, no GPU) — `ffs localchat`", "format": "openai",
               "key_env": "", "base_url": "http://127.0.0.1:8284/v1", "fast": "local", "precise": "local",
               "signup": ""},
+    # Local AI CLIs you already have installed + logged in — no API key; uses your
+    # own subscription. We run the tool's non-interactive mode and read its answer.
+    # "configured" = the command is on PATH (see provider_status).
+    "claude-cli": {"label": "Claude Code CLI (uses your login, no key)", "format": "cli", "key_env": "",
+                   "bin": "claude", "args": ["-p"], "fast": "cli", "precise": "cli",
+                   "signup": "https://claude.com/claude-code"},
+    "codex-cli": {"label": "Codex CLI (uses your login, no key)", "format": "cli", "key_env": "",
+                  "bin": "codex", "args": ["exec"], "fast": "cli", "precise": "cli",
+                  "signup": "https://developers.openai.com/codex"},
+    "antigravity-cli": {"label": "Antigravity CLI (uses your login, no key)", "format": "cli", "key_env": "",
+                        "bin": "agy", "args": ["-p"], "fast": "cli", "precise": "cli",
+                        "signup": "https://antigravity.google"},
 }
 
 # Embedding providers are implemented in embed.py; cataloged here for the UI.
@@ -146,12 +158,45 @@ def _gemini_key() -> str:
 
 
 def provider_status() -> dict:
-    """Per-provider: configured (has key) — for the settings UI."""
+    """Per-provider: configured? — for the settings UI. Keyed providers need their
+    key; CLI providers need their command on PATH; keyless local needs nothing."""
+    import shutil
     out = {}
     for pid, c in CHAT_PROVIDERS.items():
-        has = True if not c["key_env"] else bool(get_key(c["key_env"]) or (pid == "gemini" and _gemini_key()))
+        if c["format"] == "cli":
+            has = bool(shutil.which(c["bin"]))
+        elif c["key_env"]:
+            has = bool(get_key(c["key_env"]) or (pid == "gemini" and _gemini_key()))
+        else:
+            has = True
         out[pid] = {"label": c["label"], "key_env": c["key_env"], "configured": has,
                     "fast": c["fast"], "precise": c["precise"], "signup": c["signup"], "format": c["format"]}
+    return out
+
+
+def _cli_chat(bin_name: str, args: list[str], messages: list[dict], system: str, timeout: int = 600) -> str:
+    """Run a local AI CLI (Claude Code / Codex / Antigravity) in its non-interactive
+    mode and return its answer. Uses the user's own login — no API key. The whole
+    prompt (archive context + conversation) is passed as the final argument; capped to
+    stay under OS command-line limits."""
+    import shutil
+    import subprocess
+    exe = shutil.which(bin_name)
+    if not exe:
+        raise RuntimeError(f"'{bin_name}' CLI를 찾을 수 없습니다 — 설치하고 로그인했는지 확인하세요. "
+                           f"/ '{bin_name}' CLI not found on PATH — install it and sign in first.")
+    convo = "\n".join(f"{m.get('role', 'user')}: {m.get('content', '')}"
+                      for m in messages if (m.get("content") or "").strip())
+    prompt = (system + "\n\n" + convo).strip()[:12000]   # cap → safe arg length
+    try:
+        r = subprocess.run([exe, *args, prompt], capture_output=True, text=True,
+                           timeout=timeout, encoding="utf-8", errors="replace")
+    except subprocess.TimeoutExpired:
+        raise RuntimeError(f"{bin_name} CLI가 시간 내에 응답하지 않았습니다. / {bin_name} CLI timed out.")
+    out = (r.stdout or "").strip()
+    if not out:
+        raise RuntimeError(f"{bin_name} CLI가 빈 응답을 반환했습니다 (로그인/설정을 확인하세요). "
+                           f"/ {bin_name} returned nothing (check it's signed in). [{(r.stderr or '')[:200]}]")
     return out
 
 
@@ -217,6 +262,8 @@ def chat_complete(messages: list[dict], system: str, model: str, settings: dict 
     cat = CHAT_PROVIDERS.get(pid) or CHAT_PROVIDERS["gemini"]
     max_tokens, thinking = _budget(model, settings)
     try:
+        if cat["format"] == "cli":   # a local AI CLI (Claude Code / Codex / Antigravity)
+            return _cli_chat(cat["bin"], cat["args"], messages, system)
         if cat["format"] == "gemini":
             key = _gemini_key() or get_key(cat["key_env"])
             if not key:
