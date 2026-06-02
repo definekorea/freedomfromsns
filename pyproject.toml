@@ -1,6 +1,6 @@
 [project]
 name = "freedomfromsns"
-version = "0.1.19"
+version = "0.1.20"
 description = "FreedomFromSNS — browse, search, and chat with your Facebook archive, locally. Gemini-powered."
 requires-python = ">=3.10"
 dependencies = [
@@ -13,11 +13,13 @@ dependencies = [
                             # everywhere (no system ffmpeg); spaces_backend prefers a
                             # system ffmpeg and falls back to this.
     "pillow>=10",           # image thumbnail resizing (lighter/faster grid) + tray icon
+    "fastembed>=0.3",       # local, no-key embeddings (CPU/ONNX). Now CORE because local
+                            # search is the default — so an isolated `uv tool` env always
+                            # has it and upgrades never drop it. Remote providers ignore it.
 ]
 
 [project.optional-dependencies]
-# Local, no-key embeddings on CPU (fastembed/ONNX). Remote providers
-# (gemini / apicascade) need neither — they're pure HTTP.
+# Kept for compatibility; fastembed is now in core (above).
 local = ["fastembed>=0.3"]
 # GPU acceleration for the local model. ~277 MB — opt in only with a CUDA GPU
 # (FBBACKUP_EMBED_DEVICE=gpu); the setup wizard sets it when it detects one.
