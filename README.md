@@ -8,7 +8,9 @@
 **페이스북에 흩어진 당신의 기록을, 당신의 컴퓨터에서 되살립니다.**
 **Bring your Facebook archive back to life — fast, private, on your own machine.**
 
-**⬇️ Windows, one click:** download **[`install-ffs.bat`](https://github.com/definekorea/freedomfromsns/releases/latest)** and double-click it — no Python, pip, or commands needed. · _윈도우: **`install-ffs.bat`** 내려받아 더블클릭하면 끝._
+### ⬇️ Windows — 1‑click install
+**[Download `install-ffs.bat`](https://github.com/definekorea/freedomfromsns/releases/latest/download/install-ffs.bat)** → double‑click it. That's it — no Python, pip, or commands needed.
+_윈도우: 위 **`install-ffs.bat`** 파일을 내려받아 더블클릭하면 끝입니다._
 
 <table>
   <tr>
@@ -68,7 +70,12 @@
 
 한 줄이면 끝입니다. `uv`가 파이썬까지 알아서 관리하므로 파이썬·가상환경·ffmpeg를 따로 설치할 필요가 없습니다. **설치 명령 + 페이스북 데이터**만 있으면 되고, API 키는 선택입니다.
 
-**Windows — 가장 쉬운 방법(더블클릭):** [최신 릴리스](https://github.com/definekorea/freedomfromsns/releases/latest)에서 **`install-ffs.bat`** 파일을 내려받아 **더블클릭**하세요. 파이썬·uv·pip를 미리 깔 필요가 전혀 없습니다 — 설치 프로그램이 uv(작은 도구), 알맞은 파이썬, 앱을 모두 알아서 받습니다. 업데이트하려면 같은 파일을 다시 더블클릭하면 됩니다. (제거: `ffs uninstall` 또는 **`uninstall-ffs.bat`** — 데이터는 보존.)
+**Windows — 가장 쉬운 방법(더블클릭):**
+1. **[`install-ffs.bat` 내려받기](https://github.com/definekorea/freedomfromsns/releases/latest/download/install-ffs.bat)** (클릭하면 바로 다운로드)
+2. 받은 **`install-ffs.bat`을 더블클릭**하세요.
+3. 끝 — 버전을 고르고(엔터=최신) 나머지는 자동입니다.
+
+파이썬·uv·pip를 미리 깔 필요가 전혀 없습니다 — 설치 프로그램이 uv(작은 도구), 알맞은 파이썬, 앱을 모두 알아서 받습니다. 업데이트하려면 같은 파일을 다시 더블클릭하세요. 제거는 `ffs uninstall` 또는 [**`uninstall-ffs.bat`**](https://github.com/definekorea/freedomfromsns/releases/latest/download/uninstall-ffs.bat) (데이터·모델은 보존).
 > 브라우저가 `.bat` 다운로드를 경고할 수 있습니다("유지" / "추가 정보 → 실행") — 서명되지 않은 설치 프로그램이라 정상입니다.
 
 **Windows — 명령 한 줄(PowerShell 또는 cmd):**
@@ -143,7 +150,12 @@ These come from what Facebook **does and doesn't put in the export** — they ar
 
 One line. `uv` manages a pinned Python for you, so there's no Python, venv, or ffmpeg to install by hand. You only need **the install command + your Facebook download**; an API key is optional.
 
-**Windows — easiest (double-click):** download **`install-ffs.bat`** from the [latest release](https://github.com/definekorea/freedomfromsns/releases/latest) and **double-click it**. You don't need Python, uv, or pip first — the installer fetches uv (a tiny tool), the right Python, and the app for you. Double-click the same file again to update. (Uninstall: run `ffs uninstall`, or use **`uninstall-ffs.bat`** — your data is kept.)
+**Windows — easiest (double-click):**
+1. **[Download `install-ffs.bat`](https://github.com/definekorea/freedomfromsns/releases/latest/download/install-ffs.bat)** (click = direct download)
+2. **Double-click** the downloaded `install-ffs.bat`.
+3. Done — pick a version (Enter = latest); everything else is automatic.
+
+You don't need Python, uv, or pip first — the installer fetches uv (a tiny tool), the right Python, and the app for you. Double-click the same file again to update. Uninstall with `ffs uninstall` or [**`uninstall-ffs.bat`**](https://github.com/definekorea/freedomfromsns/releases/latest/download/uninstall-ffs.bat) (your data + models are kept).
 > Your browser may warn about a `.bat` download ("Keep" / "More info → Run anyway") — that's expected for an unsigned installer.
 
 **Windows — one line (PowerShell or cmd):**
