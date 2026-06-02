@@ -66,7 +66,10 @@
 
 한 줄이면 끝입니다. `uv`가 파이썬까지 알아서 관리하므로 파이썬·가상환경·ffmpeg를 따로 설치할 필요가 없습니다. **설치 명령 + 페이스북 데이터**만 있으면 되고, API 키는 선택입니다.
 
-**Windows** (네이티브 — WSL·도커 불필요):
+**Windows — 가장 쉬운 방법(더블클릭):** [최신 릴리스](https://github.com/definekorea/freedomfromsns/releases/latest)에서 **`install-ffs.bat`** 파일을 내려받아 **더블클릭**하세요. 파이썬·uv·pip를 미리 깔 필요가 전혀 없습니다 — 설치 프로그램이 uv(작은 도구), 알맞은 파이썬, 앱을 모두 알아서 받습니다. 업데이트하려면 같은 파일을 다시 더블클릭하면 됩니다. (제거: `ffs uninstall` 또는 **`uninstall-ffs.bat`** — 데이터는 보존.)
+> 브라우저가 `.bat` 다운로드를 경고할 수 있습니다("유지" / "추가 정보 → 실행") — 서명되지 않은 설치 프로그램이라 정상입니다.
+
+**Windows — 명령 한 줄(PowerShell 또는 cmd):**
 ```powershell
 powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/definekorea/freedomfromsns/master/install-ffs.ps1 | iex"
 ```
@@ -138,7 +141,10 @@ These come from what Facebook **does and doesn't put in the export** — they ar
 
 One line. `uv` manages a pinned Python for you, so there's no Python, venv, or ffmpeg to install by hand. You only need **the install command + your Facebook download**; an API key is optional.
 
-**Windows** (native — no WSL, no Docker):
+**Windows — easiest (double-click):** download **`install-ffs.bat`** from the [latest release](https://github.com/definekorea/freedomfromsns/releases/latest) and **double-click it**. You don't need Python, uv, or pip first — the installer fetches uv (a tiny tool), the right Python, and the app for you. Double-click the same file again to update. (Uninstall: run `ffs uninstall`, or use **`uninstall-ffs.bat`** — your data is kept.)
+> Your browser may warn about a `.bat` download ("Keep" / "More info → Run anyway") — that's expected for an unsigned installer.
+
+**Windows — one line (PowerShell or cmd):**
 ```powershell
 powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/definekorea/freedomfromsns/master/install-ffs.ps1 | iex"
 ```
