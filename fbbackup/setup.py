@@ -37,6 +37,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "data_place": "Move your Facebook data into your archive folder so it's all "
                       "in one place?\n  → {dest}\n  [Y/n] (press Enter for yes): ",
         "moving":    "Moving your data into {dest} …",
+        "data_inplace": "Your data is already inside your archive folder — using it where it is.",
         "parsing":   "Reading your posts…",
         "building":  "Building your timeline…",
         "parsed":    "Read {n} posts.",
@@ -118,6 +119,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "data_place": "페이스북 데이터를 기록 폴더로 옮겨 한곳에 모을까요?\n"
                       "  → {dest}\n  [Y/n] (Enter = 예): ",
         "moving":    "데이터를 {dest}(으)로 옮기는 중…",
+        "data_inplace": "데이터가 이미 기록 폴더 안에 있어 그대로 사용합니다.",
         "parsing":   "게시물을 읽는 중…",
         "building":  "타임라인을 만드는 중…",
         "parsed":    "게시물 {n}개를 읽었습니다.",
@@ -304,17 +306,28 @@ def is_within(child: Path, parent: Path) -> bool:
 
 
 def relocate_export(export_root: Path, home: Path) -> Path:
-    """Move the ``facebook-…`` folder(s) under ``export_root`` into ``~/ffs/data`` so
-    the whole archive lives in one place, and return ``~/ffs/data`` (the new root).
-    Only the export folders move — unrelated siblings are left alone."""
+    """Move the ``facebook-…`` folder(s) under ``export_root`` into ``<home>/data`` so
+    the whole archive lives in one place, and return that as the new root. Only the
+    export folders move — unrelated siblings are left alone. SAFE against circular
+    moves: a folder that IS the home, contains the home, or contains/sits-in the
+    destination is skipped (e.g. the export was unzipped directly into the home).
+    If nothing could be moved, returns the original ``export_root`` (use in place)."""
+    export_root = Path(export_root)
     dest = home / "data"
-    dest.mkdir(parents=True, exist_ok=True)
-    for child in list(Path(export_root).iterdir()):
-        if child.is_dir() and _has_export(child):
-            target = dest / child.name
-            if target.resolve() != child.resolve():
-                shutil.move(str(child), str(target))
-    return dest.resolve()
+    home_r, dest_r = home.resolve(), dest.resolve()
+    moved = False
+    for child in list(export_root.iterdir()):
+        if not (child.is_dir() and _has_export(child)):
+            continue
+        cr = child.resolve()
+        if cr == home_r or is_within(home_r, cr) or is_within(dest_r, cr) or is_within(cr, dest_r):
+            continue   # circular / already inside data → don't move
+        dest.mkdir(parents=True, exist_ok=True)
+        target = dest / child.name
+        if target.resolve() != cr:
+            shutil.move(str(child), str(target))
+            moved = True
+    return dest.resolve() if moved else export_root.resolve()
 
 
 def unzip_export(zip_path: Path, dest_parent: Path) -> Path:

@@ -8,6 +8,8 @@
 **페이스북에 흩어진 당신의 기록을, 당신의 컴퓨터에서 되살립니다.**
 **Bring your Facebook archive back to life — fast, private, on your own machine.**
 
+**⬇️ Windows, one click:** download **[`install-ffs.bat`](https://github.com/definekorea/freedomfromsns/releases/latest)** and double-click it — no Python, pip, or commands needed. · _윈도우: **`install-ffs.bat`** 내려받아 더블클릭하면 끝._
+
 <table>
   <tr>
     <td width="50%"><img src="docs/img/browse.png" alt="둘러보기 / Browse"><br><sub><b>둘러보기 · Browse</b></sub></td>

@@ -267,14 +267,20 @@ def cmd_setup(args) -> int:
         # already-extracted folder elsewhere → offer to consolidate it into the
         # archive home (default = yes). The user can decline to keep it in place.
         if not args.yes and not wiz.is_within(root, home):
-            dest = home / "data"
-            try:
-                ans = input(wiz.t(lang, "data_place", dest=dest)).strip().lower()
-            except EOFError:
-                ans = ""
-            if ans not in ("n", "no", "ㄴ", "아니", "아니오", "2", "keep"):  # Enter/anything else = move it in
-                say("moving", dest=dest)
-                chosen_root = wiz.relocate_export(root, home)
+            if wiz.is_within(home, root):
+                # the archive home sits INSIDE the export tree (e.g. the export was
+                # unzipped straight into ~/ffs) — moving it into ~/ffs/data would be
+                # circular, so just use it where it is.
+                say("data_inplace")
+            else:
+                dest = home / "data"
+                try:
+                    ans = input(wiz.t(lang, "data_place", dest=dest)).strip().lower()
+                except EOFError:
+                    ans = ""
+                if ans not in ("n", "no", "ㄴ", "아니", "아니오", "2", "keep"):  # Enter/anything = move in
+                    say("moving", dest=dest)
+                    chosen_root = wiz.relocate_export(root, home)
 
     wiz.set_export_root(home, chosen_root)
     args.export = str(chosen_root)   # the RESOLVED root wins in _paths (over the raw --export/zip/moved path)
