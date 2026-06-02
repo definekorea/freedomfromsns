@@ -27,6 +27,15 @@ _윈도우: 위 **`install-ffs.bat`** 파일을 내려받아 더블클릭하면 
 
 ---
 
+> [!IMPORTANT]
+> ### 📦 먼저 페이스북 데이터를 신청하세요 — 준비에 보통 **1~3일** 걸립니다
+> 지금 신청해 두고, 기다리는 동안 위에서 설치하세요.
+> [어카운트 센터](https://accountscenter.facebook.com) → **내 정보 및 권한** → **정보 내보내기(Export your information)** → **내보내기 만들기** → 프로필(Facebook) 선택 → **기기로 내보내기** → **형식: JSON**(❗HTML 아님) → 기간 **전체** → **내보내기 시작**. 준비되면 이메일로 **`.zip`** 이 오고, 그 파일만 있으면 됩니다.
+>
+> ### 📦 First, request your Facebook export — it can take **1–3 days**
+> Start it now and install (above) while you wait.
+> [Accounts Center](https://accountscenter.facebook.com) → **Your information and permissions** → **Export your information** → **Create export** → pick your profile (Facebook) → **Export to device** → **Format: JSON** (❗not HTML) → **All time** → **Create**. Facebook emails you a **`.zip`** when it's ready — that file is all you need.
+
 # 한국어
 
 ## FreedomFromSNS란?
