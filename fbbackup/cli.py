@@ -63,7 +63,10 @@ def _load_config() -> dict:
     if not p.is_file():
         return {}
     try:
-        import tomllib
+        try:
+            import tomllib                       # Python 3.11+
+        except ModuleNotFoundError:
+            import tomli as tomllib               # Python 3.10 fallback (declared as a dep)
         return tomllib.loads(p.read_text(encoding="utf-8"))
     except Exception as e:  # noqa: BLE001 — missing/old toml shouldn't break the CLI
         print(f"warning: could not read {p}: {e}", file=sys.stderr)
