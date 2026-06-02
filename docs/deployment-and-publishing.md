@@ -397,6 +397,50 @@ small-model findings make pieces of this plausible:
 
 ---
 
+## 9. Incremental updates — capture new posts since the last export 🔜
+
+**Goal:** keep an archive growing over time without re-doing everything, and **never
+touch the original Facebook export**. The user posts more on Facebook; they should be
+able to pull just-the-new into FFS and have it merge cleanly.
+
+**Reality check (source of new posts).** Facebook offers **no incremental/API feed**
+for your own timeline, and scraping the live site is deliberately blocked (see
+Limitations). So "new posts" come from a **fresh Facebook export** — ideally a
+**date-ranged** one ("since my last export"), or a full one. The user requests it the
+same way (Accounts Center → … → date range → Start export); FFS ingests + merges.
+
+**The merge already half-exists.** `materialize()` is idempotent and reports
+`new / updated / skipped` per row — so re-running `parse → build` over a second export
+**adds new rows and updates changed ones in `~/ffs/spaces-data` without duplicating**.
+The missing pieces are an explicit ingest-another-export flow, cross-export dedup, and
+re-embedding only the delta.
+
+**Hard constraint (the user's requirement): write only to OUR folder; never alter the
+original FB data.** Whether the archive points at the original export folder *in place*
+(`[export].root` outside `~/ffs`) or at a copy we moved into `~/ffs/data`:
+- Treat **every** export folder as **read-only** (already the rule).
+- All derived/accumulated state lives under **`~/ffs`** (`index/`, `spaces-data/`,
+  embeddings). New posts become new `.md` rows there — the FB export(s) are never written.
+- For an in-place original, a second export should be **copied into `~/ffs/data/`**
+  (read-only originals stay put); the merge reads from all known export roots.
+
+**Build sketch:**
+1. `ffs add <path-to-new-export.zip|folder>` (and/or fold into `ffs update`): unzip/locate
+   into `~/ffs/data/<dated-subfolder>`, then `parse → build` so `materialize` merges by a
+   **stable post id** (id, else date+content hash) — dedup across exports, keep the union.
+2. Re-embed only the **new** rows (the embed checkpoint is already fingerprinted by row
+   ids — extend it to append rather than rebuild when the corpus only grew).
+3. Surface counts ("N new posts added since <date>") and refresh the in-memory index.
+4. Optional later: a scheduled reminder to re-export (it takes 1–3 days), and an
+   import that accepts a date-ranged export to minimize download size.
+
+**Non-goals / open questions:** no live scraping (blocked + against the read-only,
+local-first principle); decide dedup key precisely (FB ids can be unstable across
+exports → may need date+text hash); handle media that a new export re-downloads under
+a different filename.
+
+---
+
 ## Sources
 - uv (Astral): <https://docs.astral.sh/uv/getting-started/installation/>, scripts <https://docs.astral.sh/uv/guides/scripts/>
 - Cloudflare Tunnel — quick vs named, domain requirement, limits:
