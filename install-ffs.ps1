@@ -87,19 +87,21 @@ try {
   $env:Path = "$env:USERPROFILE\.local\bin;$env:Path"
   Write-Host "uv: $(uv --version)"
 
-  # 2. Install the app, then make sure its `ffs` command is on PATH (for the new window).
+  # 2. Install the app, then make sure its `ffs` command is on PATH.
   Write-Host "Installing FreedomFromSNS…"
   uv tool install --force $Source
   try { $tb = (uv tool dir --bin 2>$null | Select-Object -First 1); if ($tb) { $env:Path = "$tb;$env:Path" } } catch {}
 
-  # 3. Open the setup wizard in its OWN window. Interactive prompts (language, etc.)
-  #    don't render through `irm | iex`, so launch a fresh console that inherits our
-  #    env (FBBACKUP_HOME, PATH) and working dir.
-  Write-Host "`nOpening the setup wizard in a new window — follow the prompts there."
-  $setupCmd = "if (Get-Command ffs -ErrorAction SilentlyContinue) { ffs setup } else { uv tool run --from '$Source' ffs setup }"
-  Start-Process -FilePath 'powershell.exe' -WorkingDirectory $base `
-    -ArgumentList '-NoExit', '-ExecutionPolicy', 'ByPass', '-Command', $setupCmd
-  $ok = $true
+  # 3. Run setup HERE — one window, no second terminal. The language is already
+  #    chosen above (FFS_LANG), so setup goes straight to finding data → build →
+  #    (optional) AI → open browser. It serves at the end (Ctrl-C to stop).
+  Write-Host "`nStarting setup…`n"
+  if (Get-Command ffs -ErrorAction SilentlyContinue) {
+    ffs setup
+  } else {
+    uv tool run --from $Source ffs setup
+  }
+  $ok = $true   # reached after setup's server is stopped (Ctrl-C) — normal exit
 }
 catch {
   Write-Host ""

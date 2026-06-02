@@ -19,8 +19,7 @@ set "FFS_PICK=1"
 powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/definekorea/freedomfromsns/master/install-ffs.ps1 | iex"
 echo.
 echo  ------------------------------------------------------------
-echo  Setup opens in its own window - follow the prompts there.
-echo  If something went wrong, the log is at:
+echo  Done. If something went wrong, the log is at:
 echo     %TEMP%\freedomfromsns-install.log
 echo  ------------------------------------------------------------
 echo.
