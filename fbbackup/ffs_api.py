@@ -286,9 +286,48 @@ def _media_of(body: str, post_id: str, title: str) -> list[dict]:
     return items
 
 
-def _chat(b, messages: list[dict], model: str) -> dict:
-    """RAG: semantic-retrieve over the user's own archive → Gemini synthesis,
-    returning {answer, sources, media, model}. `b` is the SpacesBackend."""
+def _archive_summary(b, workspace: str = "default") -> str:
+    """A compact, deterministic overview of the WHOLE archive (counts by type,
+    photo/video totals, year span + most-active year, most frequent words). RAG only
+    retrieves a few posts, so aggregate/meta questions ("how many photos?", "what did
+    I write about most?") have nothing to answer from — this summary gives them real
+    numbers. Computed from the in-memory index; best-effort."""
+    try:
+        from collections import Counter
+        idx = b._ensure_index(workspace)
+        rows = idx["rows"]
+        total = len(rows)
+        nphoto = nvideo = 0
+        by_type: dict[str, int] = {}
+        words: Counter = Counter()
+        for r in rows:
+            by_type[str(r["props"].get("type", "") or "기타")] = \
+                by_type.get(str(r["props"].get("type", "") or "기타"), 0) + 1
+            for m in (r.get("media") or []):
+                if m.get("type") == "video":
+                    nvideo += 1
+                else:
+                    nphoto += 1
+            for w in (r.get("_blob") or "").split():
+                w = w.strip(".,!?…\"'()[]{}#·")
+                if len(w) >= 2 and not w.isdigit():
+                    words[w] += 1
+        by_year_n = {y: len(rs) for y, rs in idx.get("by_year", {}).items() if y}
+        years = sorted(by_year_n)
+        span = f"{years[0]}–{years[-1]}" if years else "?"
+        top_year = max(by_year_n, key=by_year_n.get) if by_year_n else "?"
+        types_str = " · ".join(f"{k} {v}" for k, v in sorted(by_type.items(), key=lambda kv: -kv[1]))
+        top_words = " · ".join(w for w, _ in words.most_common(12))
+        return (f"전체 게시물 {total}개 · 사진 {nphoto}장 · 영상 {nvideo}개 · 기간 {span} "
+                f"(가장 활발했던 해: {top_year}).\n유형별: {types_str}\n자주 등장한 표현: {top_words}")
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def _chat(b, messages: list[dict], model: str, settings: dict | None = None) -> dict:
+    """RAG: semantic-retrieve over the user's own archive → provider synthesis,
+    returning {answer, sources, media, model}. `b` is the SpacesBackend.
+    `settings` lets the caller force a provider (e.g. the keyless→local fallback)."""
     user_turns = [m["content"] for m in messages if m.get("role") == "user" and m.get("content")]
     if not user_turns:
         return {"answer": "질문을 입력해 주세요.", "sources": [], "media": [], "model": model}
@@ -343,6 +382,11 @@ def _chat(b, messages: list[dict], model: str) -> dict:
     nimg = sum(1 for it in flat if it["type"] == "image")
     nvid = sum(1 for it in flat if it["type"] == "video")
     system = _CHAT_SYS + "\n\n"
+    summary = _archive_summary(b)
+    if summary:
+        system += ("[아카이브 요약 — 전체 통계. 개수·집계 질문(사진이 몇 장, 게시물이 몇 개, 어느 해에 "
+                   "가장 많이 썼는지, 무엇을 가장 많이 썼는지 등)은 아래 발췌가 아니라 이 요약으로 바로 "
+                   "답하세요. '확인할 수 없다'고 하지 마세요]\n" + summary + "\n\n")
     if inline:
         system += (
             f"참고: 관련 기록의 사진 {nimg}장·영상 {nvid}개가 답변 아래 갤러리에 표시되고, "
@@ -355,7 +399,7 @@ def _chat(b, messages: list[dict], model: str) -> dict:
     system += ("[내 기록 발췌]\n" + "\n---\n".join(ctx)) if ctx else "[내 기록 발췌] (관련 기록을 찾지 못했습니다.)"
 
     try:
-        answer = providers.chat_complete(messages, system, model)  # active provider (settings)
+        answer = providers.chat_complete(messages, system, model, settings)  # active/forced provider
     except Exception as e:  # noqa: BLE001
         logp = _log_error("chat", e, {"model": model, "query": query[:200],
                                       "hits": len(hits), "media": len(flat)})
@@ -575,20 +619,31 @@ def register(app: FastAPI, b) -> None:
             model = allowed[0]
         clean = [{"role": m.get("role"), "content": str(m.get("content", ""))}
                  for m in messages[-12:] if isinstance(m, dict)]
-        # the agentic tool loop is Gemini-native; for other providers fall back to RAG
-        if (body or {}).get("agent") and st["chat"].get("provider") == "gemini":
+        # Effective provider: if the chosen provider needs a key we don't have, fall
+        # back to the bundled LOCAL model — so a no-key user always gets a working chat
+        # without touching Settings (set a key to use a keyed provider instead).
+        prov = st["chat"].get("provider", "gemini")
+        cat = providers.CHAT_PROVIDERS.get(prov, {})
+        has_key = (not cat.get("key_env")) or bool(
+            providers.get_key(cat.get("key_env", "")) or (prov == "gemini" and providers._gemini_key()))
+        if prov != "local" and cat.get("key_env") and not has_key:
+            prov = "local"
+        eff = {**st, "chat": {**st["chat"], "provider": prov}}
+
+        # the agentic tool loop is Gemini-native; other providers use one-shot RAG
+        if (body or {}).get("agent") and prov == "gemini":
             from .ffs_agent import agent_chat
             return JSONResponse(agent_chat(b, clean, model))
-        if st["chat"].get("provider") == "local":   # bundled local model
+        if prov == "local":   # bundled local model — make sure it's up (non-blocking)
             from . import localchat
-            if not localchat.ensure_started_async():  # non-blocking: never freeze the server
+            if not localchat.ensure_started_async():
                 return JSONResponse({"answer": "로컬 모델을 준비하는 중입니다 — 최초 1회 모델을 내려받고 "
                                      "불러오느라 몇 분 걸릴 수 있어요. 잠시 후 다시 물어봐 주세요. "
                                      "(진행 상황: ~/ffs/localchat.log) / The local model is downloading/"
                                      "loading for the first time (a few minutes) — please ask again in a "
                                      "moment. Progress: ~/ffs/localchat.log",
                                      "sources": [], "media": [], "model": model})
-        return JSONResponse(_chat(b, clean, model))  # one-shot RAG (any provider)
+        return JSONResponse(_chat(b, clean, model, eff))  # one-shot RAG (effective provider)
 
     @app.get("/api/settings")
     def get_settings():

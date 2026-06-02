@@ -98,14 +98,19 @@ _LOCAL: dict = {}   # model_id → TextEmbedding (cached per model so query-time
 def _local_model(model_id: str | None = None):
     mid = model_id or LOCAL_MODEL
     if mid not in _LOCAL:
+        import warnings
+        os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
         from fastembed import TextEmbedding
-        # GPU is opt-in (needs the `fbbackup[gpu]` extra → onnxruntime-gpu). The
-        # setup wizard sets FBBACKUP_EMBED_DEVICE=gpu when it detects a GPU;
-        # CUDA→CPU fallback is automatic if the GPU provider isn't available.
-        if os.environ.get("FBBACKUP_EMBED_DEVICE", "").lower() == "gpu":
-            _LOCAL[mid] = TextEmbedding(mid, providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
-        else:
-            _LOCAL[mid] = TextEmbedding(mid)
+        # Quiet the benign fastembed/HF load-time notices (mean-pooling note, symlink
+        # warning) — embeddings are correct and self-consistent (corpus + query use
+        # the same model). GPU is opt-in (needs the `fbbackup[gpu]` extra); the wizard
+        # sets FBBACKUP_EMBED_DEVICE=gpu, and CUDA→CPU fallback is automatic.
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            if os.environ.get("FBBACKUP_EMBED_DEVICE", "").lower() == "gpu":
+                _LOCAL[mid] = TextEmbedding(mid, providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
+            else:
+                _LOCAL[mid] = TextEmbedding(mid)
     return _LOCAL[mid]
 
 
