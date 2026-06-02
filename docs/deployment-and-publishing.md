@@ -6,10 +6,26 @@ macOS, or Linux**, with as few manual steps as possible. This is the plan that
 realizes the North Star ("the easy way for anyone… on every major OS, even with
 zero technical skill").
 
-Status: **design + research doc.** Some of it already exists in `fbbackup`
-(`ffs serve/share/export-static/publish/doctor`, `recommend_sharing()`, the
-optional `local`/`gpu` extras, graceful ffmpeg/embedding fallbacks); the rest is
-the roadmap. Each section marks ✅ done / 🔜 to build.
+Status: **design + research doc.** Each section marks ✅ done / 🔜 to build.
+
+**Shipped as of v0.1.27** (the only published release — see [project memory] for the
+full history): one-command + **one-click `install-ffs.bat`** installer (uv brings its
+own Python; no Python/pip/uv prerequisite; asks **language first**; offers a version
+picker; cache-busted release lookup; Python ≥3.10; **`fastembed` is now a core dep**);
+the i18n setup wizard (auto-locate zip/folder, move-into-`~/ffs` with read-only
+originals, build → open browser); **Tier 0** browse/calendar/category-lightbox/keyword;
+**Tier 1** local semantic search defaulting to **MiniLM on CPU** (reliable even where a
+GPU isn't usable — no auto-pick of the heavy e5-large); **Tier 2 chat** with a clean
+provider model — Gemini (agentic tool-loop), any OpenAI-compatible key (DeepSeek/
+OpenAI/Anthropic/Groq/…), **a bundled no-key local model** (`ffs localchat`: EXAONE
+3.5 2.4B default · Qwen3 · Bonsai), and **local AI CLIs** (Claude Code / Codex /
+Antigravity — uses your own login, no key); setup auto-prefers a working CLI, then a
+key, then the local model; keyless→local fallback; archive-summary grounding +
+deterministic photo/count answers; in-app **Publish** (quick tunnel) + `ffs tunnel`;
+`ffs tray/autostart/shortcut/uninstall` (uninstall keeps data + models, reports
+reclaimable caches). **No weft/apicascade dependency** — fully local/self-contained.
+
+Still roadmap: §8 mobile, §9 incremental updates (below), public-chat safety wiring.
 
 ---
 
@@ -35,15 +51,15 @@ Everything AI is an *optional unlock* surfaced in-app, never a gate.
 Each tier is independently optional and **never blocks the tier below it**
 (offline, no key, or a failed model download → the tier below still fully works).
 The engine already supports this split — `embed.py:resolve_provider()` falls back
-`gemini → weft → local`, browse/keyword-search touch no key or embeddings, and
-`_semantic()` degrades to empty gracefully. What's new is the *packaging default*
+`gemini → local` (the old `weft`/apicascade provider was removed), browse/keyword-
+search touch no key or embeddings, and `_semantic()` degrades to empty gracefully. What's new is the *packaging default*
 (Tier 0 = pure wheels) and the *framing* (AI is a surfaced unlock, not step 2).
 
 | Tier | Name (plain language) | Needs | Unlocks |
 |---|---|---|---|
 | **0** | **Your archive** | nothing — no key, no download, no questions | Browse · timeline/calendar · filter · **keyword search** · galleries · lightbox · link previews · video posters |
-| **1** | **Smart search** | no key; an in-app opt-in. **Hardware-aware:** capable GPU/CPU → one-time local-model download (no key); weak hardware → a free Gemini / Mistral key | Meaning-based / semantic search |
-| **2** | **Chat with your archive** | an AI connection (free Google key or your own) | RAG chat · agentic tool-loop · the "talk to your own posts" experience |
+| **1** | **Smart search** | no key; in-app opt-in. **Default = the local model whenever the machine can run it, even if slow** (MiniLM on CPU); a free API key (Gemini, DeepSeek, …) is the opt-in for speed/quality | Meaning-based / semantic search |
+| **2** | **Chat with your archive** | an AI connection — a free/paid key (Gemini · DeepSeek · …), a **local AI CLI** you already have (Claude Code/Codex/Antigravity), or the **bundled no-key local model** | RAG chat · agentic tool-loop (Gemini) · the "talk to your own posts" experience |
 
 **Decision (locked):** Tier 1 is **opt-in**, not bundled — the basic install is
 pure-Python wheels (tiny, instant), and "Smarter search?" is an in-app card that
@@ -397,47 +413,83 @@ small-model findings make pieces of this plausible:
 
 ---
 
-## 9. Incremental updates — capture new posts since the last export 🔜
+## 9. Incremental updates — keep the archive growing 🔜
 
-**Goal:** keep an archive growing over time without re-doing everything, and **never
-touch the original Facebook export**. The user posts more on Facebook; they should be
-able to pull just-the-new into FFS and have it merge cleanly.
+**Goal:** add new posts over time without redoing everything, and **never touch the
+original Facebook export**. Two complementary front-ends feed **one ingest core**:
 
-**Reality check (source of new posts).** Facebook offers **no incremental/API feed**
-for your own timeline, and scraping the live site is deliberately blocked (see
-Limitations). So "new posts" come from a **fresh Facebook export** — ideally a
-**date-ranged** one ("since my last export"), or a full one. The user requests it the
-same way (Accounts Center → … → date range → Start export); FFS ingests + merges.
+- **9a — bulk re-export merge** — the user requests a fresh (ideally date-ranged)
+  Facebook export; FFS ingests + merges it. Good for catching up in bulk.
+- **9b — live per-post capture** (the elegant day-to-day path) — a browser extension
+  captures the post you're *looking at* (incl. reshares + video) and POSTs it to the
+  local FFS server. No 1–3 day export wait; and it captures what the export **omits**.
 
-**The merge already half-exists.** `materialize()` is idempotent and reports
-`new / updated / skipped` per row — so re-running `parse → build` over a second export
-**adds new rows and updates changed ones in `~/ffs/spaces-data` without duplicating**.
-The missing pieces are an explicit ingest-another-export flow, cross-export dedup, and
-re-embedding only the delta.
+### Shared ingest core (both paths) + the read-only rule
 
-**Hard constraint (the user's requirement): write only to OUR folder; never alter the
-original FB data.** Whether the archive points at the original export folder *in place*
-(`[export].root` outside `~/ffs`) or at a copy we moved into `~/ffs/data`:
-- Treat **every** export folder as **read-only** (already the rule).
-- All derived/accumulated state lives under **`~/ffs`** (`index/`, `spaces-data/`,
-  embeddings). New posts become new `.md` rows there — the FB export(s) are never written.
-- For an in-place original, a second export should be **copied into `~/ffs/data/`**
-  (read-only originals stay put); the merge reads from all known export roots.
+Everything derived/accumulated lives under **`~/ffs`** (`index/`, `spaces-data/`,
+embeddings); **every Facebook export folder is read-only and never written.** New posts
+become new `.md` rows under `~/ffs`. If the archive points at an original export *in
+place* (outside `~/ffs`), a new source is **copied into `~/ffs/data/`** first.
 
-**Build sketch:**
-1. `ffs add <path-to-new-export.zip|folder>` (and/or fold into `ffs update`): unzip/locate
-   into `~/ffs/data/<dated-subfolder>`, then `parse → build` so `materialize` merges by a
-   **stable post id** (id, else date+content hash) — dedup across exports, keep the union.
-2. Re-embed only the **new** rows (the embed checkpoint is already fingerprinted by row
-   ids — extend it to append rather than rebuild when the corpus only grew).
-3. Surface counts ("N new posts added since <date>") and refresh the in-memory index.
-4. Optional later: a scheduled reminder to re-export (it takes 1–3 days), and an
-   import that accepts a date-ranged export to minimize download size.
+The merge **already half-exists:** `materialize()` is idempotent and reports
+`new / updated / skipped`, so re-running `parse → build` over more data adds/updates
+rows in `~/ffs/spaces-data` without duplicating. Missing pieces (shared): an explicit
+ingest entrypoint, **dedup by a stable post id** (FB `pfbid` from the permalink, else a
+`date+text` hash — FB ids drift), and **embed only the delta** (the embed checkpoint is
+already fingerprinted by row ids → append instead of rebuild when the corpus only grew).
 
-**Non-goals / open questions:** no live scraping (blocked + against the read-only,
-local-first principle); decide dedup key precisely (FB ids can be unstable across
-exports → may need date+text hash); handle media that a new export re-downloads under
-a different filename.
+### 9a. Bulk re-export merge
+
+Facebook offers **no incremental API** for your own timeline. So "since my last export"
+means a fresh export (Accounts Center → … → date range → Start export). Build:
+`ffs add <export.zip|folder>` (and/or `ffs update`) → copy/locate into `~/ffs/data/` →
+`parse → build` merges by id → embed the delta → "N new posts added." Optional: a
+scheduled reminder to re-export; accept a date-ranged export to shrink the download.
+
+### 9b. Live per-post capture (browser extension → local FFS) — the elegant path
+
+Design grounded in **`~/dev/fb-wp-importer`**, a mature browser extension that already
+solves the two hard problems; we reuse it and swap the *destination* from WordPress to
+the local FFS server, dropping the remote stack entirely.
+
+**Reuse, don't rebuild — what the extension already does:**
+- **`scrape.js`** scrapes the open post: text (with emoji), images (real photos, skips
+  black poster frames), YouTube, and **reshares** — splitting *your* commentary from the
+  original author's text and finding the original author + link. (FB's logged-in DOM,
+  from the content-script isolated world, which is CSP-exempt — a bookmarklet can't do
+  this.)
+- **`background.js`** captures the right **DASH video track + lockstep audio** via
+  `webRequest`, with a user chooser for ambiguous cases.
+- The POST **endpoint is already a setting** (`storage.local.endpoint`) → point it at FFS.
+
+**FFS side — new `POST /api/import/fb` (loopback-gated):** accepts the extension's
+existing payload (`is_share, sharer_text, body_text, image_urls, video_urls, audio_url,
+youtube_urls, original_author/_url, original_url, source_url, post_time`) and:
+1. maps it → a canonical post (`type` share/photo/video/link/status; reshare keeps the
+   original author/link + text per `fb-wp-importer/test/CONTRACT.md`);
+2. **downloads media into `~/ffs/data/captured/<id>/`** — and **muxes video locally with
+   the bundled `imageio-ffmpeg`** (`-c copy -map 0:v -map 1:a`), so there's **no weft
+   `/fb-mux`, no `api.unattached.me`, no WordPress** — fully local/self-contained;
+3. writes a `spaces-data` `.md` row (reuse `spaces_writer`), dedups by id, embeds the delta,
+   refreshes the in-memory index; returns `{ok, id}`.
+
+**Extension side — minimal:** an "FFS (local)" destination preset (endpoint =
+`http://127.0.0.1:8282/api/import/fb`, skip the WP token) + `localhost` host permission.
+All scraping/video/chooser code untouched.
+
+**Why 9b is the elegant win:**
+- Reuses both pipelines (the extension's capture + FFS's canonical→row→embed); the
+  endpoint is just a mapper + media downloader.
+- **Fully local, no weft/WP** — matches FFS's local-first, self-contained direction.
+- **Fixes the export's biggest gap:** reshares (which the JSON export omits — see
+  Limitations) ARE captured live, so this is strictly additive.
+- Same merge target + dedup as 9a → one ingest core, two front-ends.
+
+**Open decisions / risks:** server-side fetch of `scontent`/video CDN URLs works for
+most (signed/public) media, but **session-gated media could fail** (FFS has no FB
+cookies) → fallback is to have the extension (which has the session) send the bytes;
+dedup key precision (pfbid vs date+text hash); video tracks must be fetchable server-side
+(FFS has ffmpeg; reuse the `/fb-mux` logic locally).
 
 ---
 

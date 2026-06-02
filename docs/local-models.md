@@ -148,11 +148,15 @@ small-model findings above are the foundation for the on-device-processing quest
 
 ## Build order (when pursued)
 
-1. ✅ **Local embedding default swapped** to `paraphrase-multilingual-MiniLM-L12-v2`
-   (measured winner on CPU; *not* Nomic), with a curated `EMBED_MODELS` registry
-   (`mini` for CPU, `large` = multilingual-e5 for GPU; jina-v3/nomic/bge-small ruled
-   out) and a model-aware "related" threshold. The hardware tester (probe →
-   micro-bench → back-off) selects the model and confirms viability. (S) — done.
+1. ✅ **Local embedding = `paraphrase-multilingual-MiniLM-L12-v2` on CPU, always**
+   (measured winner; *not* Nomic). `EMBED_MODELS` still lists `large` (multilingual-e5,
+   1024-d) but **`recommend_embed()` no longer auto-picks it on GPU** (v0.1.25): a
+   detected GPU often isn't actually usable by onnxruntime (e.g. cuDNN missing) and the
+   big model then **stalled on CPU** ("smart indexing stuck at 0"). MiniLM is reliable
+   everywhere and fast on CPU; `large`+GPU is opt-in via `FBBACKUP_EMBED_MODEL` +
+   `FBBACKUP_EMBED_DEVICE=gpu`. The micro-bench now gates on **runnability (OOM)**, not
+   speed (local is the default even if slow). Query embeds with the **corpus's recorded
+   model** (meta), with a dim-mismatch guard. (S) — done.
 2. ✅ **No-key local chat** — built (`fbbackup/localchat.py` + `ffs localchat`). We
    download a prebuilt `llama-server` (PrismML's llama.cpp fork, `prism-b8846-d104cf1`;
    carries the Q2_0 ternary kernels AND runs ordinary GGUFs — no compiler), run a
@@ -167,8 +171,13 @@ small-model findings above are the foundation for the on-device-processing quest
      the Korean RAG tests (English-centric). Kept for low-end/English use only.
    Validated end-to-end on Linux (download/extract/run/switch/chat). RAG-only; for top
    quality a Gemini key still wins.
-3. Fold a hardware-gated **opt-in offer** into the setup wizard once confirmed on a
-   low-powered device. (next)
+3. ✅ **Setup auto-wires no-key chat**: local path downloads/starts EXAONE in the
+   background and sets it as the chat provider (v0.1.15).
+4. ✅ **Local AI CLI providers** (v0.1.26–27): `claude-cli` (`claude -p`), `codex-cli`
+   (`codex exec`), `antigravity-cli` (`agy -p`) — `providers._cli_chat` shells out to a
+   tool you already have installed + logged in (your own subscription, no key). Setup
+   **prefers a working CLI** over downloading the local model (priority: Gemini key →
+   working CLI → bundled local model → keyless-lazy-local).
 
 ## Sources
 - PrismML Ternary Bonsai: <https://prismml.com/news/ternary-bonsai>, <https://www.prnewswire.com/news-releases/prismml-introduces-ternary-bonsai-model-family-302745151.html>
